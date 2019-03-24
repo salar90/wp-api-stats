@@ -1,9 +1,14 @@
 <?php
+if ( ! defined( 'WPINC' ) ) {
+	die;
+}
+
 class SG_API_Tracker{
 	private $settings = [];
 
 	function __construct() {
 		$this->settings["menu_mode"] = "SUBMENU";
+		$this->register_hooks();
 	}
 
 	function register_hooks(){

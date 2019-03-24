@@ -24,7 +24,7 @@ class SG_API_Tracker{
 	}
 
 	function admin_page(){
-		echo "Hello World";
+		include __DIR__ . '/views/admin-panel.php';
 	}
 
 

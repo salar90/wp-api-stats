@@ -17,6 +17,10 @@
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
+require_once __DIR__ . "/administration.php";
+register_uninstall_hook(__FILE__, 'sg_api_tracker_uninstall');
+register_activation_hook( __FILE__, 'sg_api_tracker_activation' );
+register_deactivation_hook( __FILE__, 'sg_api_tracker_deactivation' );
 
 function sg_init_api_tracker(){
 	include_once __DIR__ . "/class-wp-api-tracker.php";

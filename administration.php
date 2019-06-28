@@ -24,6 +24,7 @@ function sg_api_tracker_create_db(){
 
 	$sql = "CREATE TABLE $table_name (
 	id mediumint(9) NOT NULL AUTO_INCREMENT,
+	user mediumint(9),
 	time timestamp,
 	method tinytext NOT NULL,
 	route text NOT NULL,

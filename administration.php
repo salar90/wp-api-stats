@@ -26,6 +26,7 @@ function sg_api_tracker_create_db(){
 	id mediumint(9) NOT NULL AUTO_INCREMENT,
 	user mediumint(9),
 	time timestamp,
+	duration mediumint(9),
 	method tinytext NOT NULL,
 	route text NOT NULL,
 	version varchar(45),

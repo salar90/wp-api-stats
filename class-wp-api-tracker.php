@@ -13,55 +13,32 @@ class SG_API_Tracker{
 
 	function register_hooks(){
 		add_action("admin_menu",[$this,"admin_menu"]);
-//		add_filter( 'rest_pre_serve_request' , [$this,'track'] , 5 , 3 );
-		add_filter( 'rest_post_dispatch' , [$this,'log_call'] , 5 , 3 );
-	}
-
-	function track( $response, WP_REST_Server $handler, WP_REST_Request $request ){
-
-		$current_minute_json = get_option("sg_api_tracker_minute" , "[]");
-		$current_minute = json_decode($current_minute_json , true);
-		if(empty($current_minute)){
-			$current_minute = [];
-		}
-		$time = time();
-		$modified = false;
-		foreach ($current_minute as $key => $entry_data){
-			if($entry_data['time'] < $time - 60){
-				unset($current_minute[$key]);
-				$modified = true;
-			}
-		}
-		if($modified){
-			$current_minute = array_values($current_minute);
-		}
-
-		$response_status = 0;
-		if(is_a($response,WP_HTTP_Response::class)){
-			$response_status = $response->get_status();
-		}
-		if(is_a($response,WP_Error::class)){
-			$response_status = $response->get_error_code();
-		}
-
-
-		$new_entry = [
-			'method' => $request->get_method(),
-			'route' => $request->get_route(),
-			'response_status' => $response_status,
-			'time' => $time
-		];
-
-		$current_minute[] = $new_entry;
-
-		$current_minute_json = json_encode($current_minute);
-		update_option( 'sg_api_tracker_minute' ,$current_minute_json ,false);
-		return $response;
+		add_filter( 'rest_pre_serve_request' , [$this,'pre_serve'] , 5, 4 );
+		add_action( 'rest_api_init' , [$this,'rest_api_init'] , 5 );
 	}
 
 
-	function log_call($response, WP_REST_Server $handler, WP_REST_Request $request){
+	/**
+	 * API init (the very beginning of a request)
+	 *
+	 */
+	function rest_api_init(){
+		global $api_tracker_start_time;
+		$api_tracker_start_time = microtime(true);
+	}
+
+	/**
+	 * Things to do just before echoing the API response.
+	 *
+	 *
+	 * @param bool             $served  Whether the request has already been served.
+	 * @param WP_HTTP_Response $response  Result to send to the client. Usually a WP_REST_Response.
+	 * @param WP_REST_Request  $request Request used to generate the response.
+	 * @param WP_REST_Server   $server    Server instance.
+	 */
+	function pre_serve($served, $response, $request, $server){
 		global $wpdb;
+		global $api_tracker_start_time;
 		$table_name = $wpdb->prefix . 'sg_api_tracker_events'; 
 
 		$response_status = 0;
@@ -71,8 +48,10 @@ class SG_API_Tracker{
 		if(is_a($response,WP_Error::class)){
 			$response_status = $response->get_error_code();
 		}
-		$time = time();
+		$time = current_time('mysql');
 		
+		$end_time = microtime(true);
+		$time_taken = floor( ($end_time - $api_tracker_start_time)*1000 );
 		
 
 		$new_entry = [
@@ -80,11 +59,12 @@ class SG_API_Tracker{
 			'route' => $request->get_route(),
 			'respose_code' => $response_status,
 			'time' => $time,
-			// 'user' => 0  // Todo: detect user
+			'duration' => $time_taken,
+			// 'user' => $user->ID  // Todo: detect user
 		];
 		$wpdb->insert($table_name, $new_entry);
 
-		return $response;
+		return $served;
 
 	}
 

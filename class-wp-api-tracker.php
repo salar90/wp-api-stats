@@ -14,7 +14,7 @@ class SG_API_Tracker{
 	function register_hooks(){
 		add_action("admin_menu",[$this,"admin_menu"]);
 //		add_filter( 'rest_pre_serve_request' , [$this,'track'] , 5 , 3 );
-		add_filter( 'rest_post_dispatch' , [$this,'track'] , 5 , 3 );
+		add_filter( 'rest_post_dispatch' , [$this,'log_call'] , 5 , 3 );
 	}
 
 	function track( $response, WP_REST_Server $handler, WP_REST_Request $request ){
@@ -57,6 +57,35 @@ class SG_API_Tracker{
 		$current_minute_json = json_encode($current_minute);
 		update_option( 'sg_api_tracker_minute' ,$current_minute_json ,false);
 		return $response;
+	}
+
+
+	function log_call($response, WP_REST_Server $handler, WP_REST_Request $request){
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'sg_api_tracker_events'; 
+
+		$response_status = 0;
+		if(is_a($response,WP_HTTP_Response::class)){
+			$response_status = $response->get_status();
+		}
+		if(is_a($response,WP_Error::class)){
+			$response_status = $response->get_error_code();
+		}
+		$time = time();
+		
+		
+
+		$new_entry = [
+			'method' => $request->get_method(),
+			'route' => $request->get_route(),
+			'respose_code' => $response_status,
+			'time' => $time,
+			// 'user' => 0  // Todo: detect user
+		];
+		$wpdb->insert($table_name, $new_entry);
+
+		return $response;
+
 	}
 
 

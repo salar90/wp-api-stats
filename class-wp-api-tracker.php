@@ -68,7 +68,9 @@ class SG_API_Tracker{
 
 	}
 
-
+	/**
+	 * Admin menu setup
+	 */
 	function admin_menu(){
 		if( $this->settings['menu_mode'] == "SUBMENU" ){
 			add_submenu_page('tools.php' , __("API Tracker","api-tracker") , __("API Tracker","api-tracker") , 'manage_options' , 'api-tracker' , [$this,"admin_page"] );
@@ -77,6 +79,9 @@ class SG_API_Tracker{
 		}
 	}
 
+	/**
+	 * Display admin page contents
+	 */
 	function admin_page(){
 		$this->stats = $this->load_stats();
 		include __DIR__ . '/views/admin-panel.php';

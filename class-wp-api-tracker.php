@@ -7,6 +7,7 @@ class SG_API_Tracker{
 	private $settings = [];
 
 	function __construct() {
+		date_default_timezone_set('UTC');
 		$this->settings["menu_mode"] = "SUBMENU";
 		$this->register_hooks();
 	}

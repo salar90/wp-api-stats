@@ -1,67 +1,70 @@
 <?php
+if ( ! defined( 'WPINC' ) ) {
+	die;
+}
 
-	$current_date_from = filter_input(INPUT_POST, 'date-from', FILTER_SANITIZE_STRING);
-	$current_date_to = filter_input(INPUT_POST, 'date-to', FILTER_SANITIZE_STRING);
-	$selected_chunk =filter_input(INPUT_POST, 'chunk', FILTER_SANITIZE_STRING);
+$current_date_from = filter_input(INPUT_POST, 'date-from', FILTER_SANITIZE_STRING);
+$current_date_to = filter_input(INPUT_POST, 'date-to', FILTER_SANITIZE_STRING);
+$selected_chunk =filter_input(INPUT_POST, 'chunk', FILTER_SANITIZE_STRING);
 
-	if(empty($current_date_from)){
-		$current_date_from = date('Y-m-d', time()- 24*3600);
+if(empty($current_date_from)){
+	$current_date_from = date('Y-m-d', time()- 24*3600);
+}
+
+if(empty($current_date_to)){
+	$current_date_to = date('Y-m-d',strtotime('today') );
+}
+
+if(empty($selected_chunk)){
+	$selected_chunk = 'Day';
+}
+
+
+$duration = strtotime($current_date_to) - strtotime($current_date_from) + 3600*24;
+
+$chunks = [
+	'Minute'	=> 60,
+	'Hour'		=> 3600,
+	'Day'		=> 3600*24,
+	'Week'		=> 3600*24*7
+];
+
+
+$chunkUp = [
+	'Minute'	=> 'Hour',
+	'Hour'		=> 'Day',
+	'Day'		=> 'Week'
+];
+while ( ($chunk_count = ceil( $duration / $chunks[$selected_chunk] )) > 3000){
+	if( array_key_exists($selected_chunk, $chunkUp) ){
+		$selected_chunk = $chunkUp[$selected_chunk];
+	}else{
+		break;
 	}
+}
 
-	if(empty($current_date_to)){
-		$current_date_to = date('Y-m-d',strtotime('today') );
-	}
+$start = strtotime($current_date_from);
 
-	if(empty($selected_chunk)){
-		$selected_chunk = 'Day';
-	}
+global $wpdb;
 
+$data['all'] = [];
+$labels = range(1,$chunk_count);
 
-	$duration = strtotime($current_date_to) - strtotime($current_date_from) + 3600*24;
-
-	$chunks = [
-		'Minute'	=> 60,
-		'Hour'		=> 3600,
-		'Day'		=> 3600*24,
-		'Week'		=> 3600*24*7
-	];
-
+for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	
-	$chunkUp = [
-		'Minute'	=> 'Hour',
-		'Hour'		=> 'Day',
-		'Day'		=> 'Week'
-	];
-	while ( ($chunk_count = ceil( $duration / $chunks[$selected_chunk] )) > 3000){
-		if( array_key_exists($selected_chunk, $chunkUp) ){
-			$selected_chunk = $chunkUp[$selected_chunk];
-		}else{
-			break;
-		}
-	}
+	$ch_start = $i;
+	$ch_end = $ch_start + $chunks[$selected_chunk];
 	
-	$start = strtotime($current_date_from);
-
-	global $wpdb;
-
-	$data['all'] = [];
-	$labels = range(1,$chunk_count);
-
-	for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
-		
-		$ch_start = $i;
-		$ch_end = $ch_start + $chunks[$selected_chunk];
-		
-		$q_start = 	"'" . date("Y-m-d H:i:s", $ch_start) . "'";
-		$q_end = 	"'" .date("Y-m-d H:i:s", $ch_end) . "'";
-		
-		$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_tracker_events WHERE time >= $q_start AND time < $q_end", OBJECT );
-		$count = count($results);
-		$data['all'][] = $count;
-		
-	}
-	$json_labels = json_encode($labels);
-	$json_data_all = json_encode($data['all']);
+	$q_start = 	"'" . date("Y-m-d H:i:s", $ch_start) . "'";
+	$q_end = 	"'" .date("Y-m-d H:i:s", $ch_end) . "'";
+	
+	$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_tracker_events WHERE time >= $q_start AND time < $q_end", OBJECT );
+	$count = count($results);
+	$data['all'][] = $count;
+	
+}
+$json_labels = json_encode($labels);
+$json_data_all = json_encode($data['all']);
 
 
 ?>

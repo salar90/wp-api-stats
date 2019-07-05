@@ -1,5 +1,24 @@
 <?php
 
+	$current_date_from = filter_input(INPUT_POST, 'date-from', FILTER_SANITIZE_STRING);
+	$current_date_to = filter_input(INPUT_POST, 'date-to', FILTER_SANITIZE_STRING);
+	$selected_chunk =filter_input(INPUT_POST, 'chunk', FILTER_SANITIZE_STRING);
+
+	if(empty($current_date_from)){
+		$current_date_from = date('Y-m-d', time()- 24*3600);
+	}
+
+	if(empty($current_date_to)){
+		$current_date_to = date('Y-m-d',strtotime('today') );
+	}
+
+	if(empty($selected_chunk)){
+		$selected_chunk = 'Day';
+	}
+
+
+	$duration = strtotime($current_date_to) - strtotime($current_date_from) + 3600*24;
+
 	$chunks = [
 		'Minute'	=> 60,
 		'Hour'		=> 3600,
@@ -7,17 +26,13 @@
 		'Week'		=> 3600*24*7
 	];
 
-	$selected_chunk = 'Minute';
+	
+	$chunk_count = ceil( $duration / $chunks[$selected_chunk] );
 	
 	$end = time() + 3600*4;
 	
-	$duration = ( 20 ) * $chunks[$selected_chunk]  ;
-
 	$start = time() - $duration;
 
-
-	$chunk_count = ceil( $duration / $chunks[$selected_chunk] );
-	
 	global $wpdb;
 
 	$data['all'] = [];
@@ -57,8 +72,34 @@
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.css" />
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"></script>
 
-	<div class="at-controls">
-		
+	<div class="at-controls" dir="ltr">
+		<form action="" method="POST">
+			<label>
+				Date From
+				<input type="date" name="date-from" id="date-from" value="<?= $current_date_from ?>" >
+			</label>
+			&emsp;
+
+			<label>
+				Date To
+				<input type="date" name="date-to" id="date-to" value="<?= $current_date_to ?>">
+			</label>
+			&emsp;
+
+			<label>
+				Points
+				<select name="chunk" id="chunks">
+					<option <?php selected($selected_chunk, 'Minute') ?> value="Minute">Minute</option>
+					<option <?php selected($selected_chunk, 'Hour') ?> value="Hour">Hour</option>
+					<option <?php selected($selected_chunk, 'Day') ?> value="Day">Day</option>
+					<option <?php selected($selected_chunk, 'Week') ?> value="Week">Week</option>
+				</select>
+			</label>
+			&emsp;
+
+			<button class="button">Apply</button>
+
+		</form>
 	</div>
 
 

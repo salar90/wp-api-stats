@@ -16,7 +16,7 @@ if(empty($current_date_to)){
 }
 
 if(empty($selected_chunk)){
-	$selected_chunk = 'Day';
+	$selected_chunk = 'Hour';
 }
 
 
@@ -87,24 +87,24 @@ $json_data_all = json_encode($data['all']);
 	<div class="at-controls" dir="ltr">
 		<form action="" method="POST">
 			<label>
-				Date From
+				<?php _e("Date From", "api-tracker") ?>
 				<input type="date" name="date-from" id="date-from" value="<?= $current_date_from ?>" >
 			</label>
 			&emsp;
 
 			<label>
-				Date To
+				<?php _e("Date To", "api-tracker") ?>
 				<input type="date" name="date-to" id="date-to" value="<?= $current_date_to ?>">
 			</label>
 			&emsp;
 
 			<label>
-				Points
+				<?php _e("Points", "api-tracker") ?>
 				<select name="chunk" id="chunks">
-					<option <?php selected($selected_chunk, 'Minute') ?> value="Minute">Minute</option>
-					<option <?php selected($selected_chunk, 'Hour') ?> value="Hour">Hour</option>
-					<option <?php selected($selected_chunk, 'Day') ?> value="Day">Day</option>
-					<option <?php selected($selected_chunk, 'Week') ?> value="Week">Week</option>
+					<option <?php selected($selected_chunk, 'Minute') ?> value="Minute"><?php _e("Minute", "api-tracker") ?></option>
+					<option <?php selected($selected_chunk, 'Hour') ?> value="Hour"><?php _e("Hour", "api-tracker") ?></option>
+					<option <?php selected($selected_chunk, 'Day') ?> value="Day"><?php _e("Day", "api-tracker") ?></option>
+					<option <?php selected($selected_chunk, 'Week') ?> value="Week"><?php _e("Week", "api-tracker") ?></option>
 				</select>
 			</label>
 			&emsp;

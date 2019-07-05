@@ -27,11 +27,20 @@
 	];
 
 	
-	$chunk_count = ceil( $duration / $chunks[$selected_chunk] );
+	$chunkUp = [
+		'Minute'	=> 'Hour',
+		'Hour'		=> 'Day',
+		'Day'		=> 'Week'
+	];
+	while ( ($chunk_count = ceil( $duration / $chunks[$selected_chunk] )) > 3000){
+		if( array_key_exists($selected_chunk, $chunkUp) ){
+			$selected_chunk = $chunkUp[$selected_chunk];
+		}else{
+			break;
+		}
+	}
 	
-	$end = time() + 3600*4;
-	
-	$start = time() - $duration;
+	$start = strtotime($current_date_from);
 
 	global $wpdb;
 

@@ -58,7 +58,7 @@ for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	$q_start = 	"'" . date("Y-m-d H:i:s", $ch_start) . "'";
 	$q_end = 	"'" .date("Y-m-d H:i:s", $ch_end) . "'";
 	
-	$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_Stats_events WHERE time >= $q_start AND time < $q_end", OBJECT );
+	$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_stats_events WHERE time >= $q_start AND time < $q_end", OBJECT );
 	$count = count($results);
 	$data['all'][] = $count;
 	
@@ -69,7 +69,7 @@ $json_data_all = json_encode($data['all']);
 
 ?>
 <div class="wrap">
-	<h1 class="wp-heading-inline"><?php _e("API Stats", "api-Stats") ?></h1>
+	<h1 class="wp-heading-inline"><?php _e("API Stats", "api-stats") ?></h1>
 	<hr class="wp-header-end">
 	<br>
 
@@ -87,24 +87,24 @@ $json_data_all = json_encode($data['all']);
 	<div class="at-controls" dir="ltr">
 		<form action="" method="POST">
 			<label>
-				<?php _e("Date From", "api-Stats") ?>
+				<?php _e("Date From", "api-stats") ?>
 				<input type="date" name="date-from" id="date-from" value="<?= $current_date_from ?>" >
 			</label>
 			&emsp;
 
 			<label>
-				<?php _e("Date To", "api-Stats") ?>
+				<?php _e("Date To", "api-stats") ?>
 				<input type="date" name="date-to" id="date-to" value="<?= $current_date_to ?>">
 			</label>
 			&emsp;
 
 			<label>
-				<?php _e("Points", "api-Stats") ?>
+				<?php _e("Points", "api-stats") ?>
 				<select name="chunk" id="chunks">
-					<option <?php selected($selected_chunk, 'Minute') ?> value="Minute"><?php _e("Minute", "api-Stats") ?></option>
-					<option <?php selected($selected_chunk, 'Hour') ?> value="Hour"><?php _e("Hour", "api-Stats") ?></option>
-					<option <?php selected($selected_chunk, 'Day') ?> value="Day"><?php _e("Day", "api-Stats") ?></option>
-					<option <?php selected($selected_chunk, 'Week') ?> value="Week"><?php _e("Week", "api-Stats") ?></option>
+					<option <?php selected($selected_chunk, 'Minute') ?> value="Minute"><?php _e("Minute", "api-stats") ?></option>
+					<option <?php selected($selected_chunk, 'Hour') ?> value="Hour"><?php _e("Hour", "api-stats") ?></option>
+					<option <?php selected($selected_chunk, 'Day') ?> value="Day"><?php _e("Day", "api-stats") ?></option>
+					<option <?php selected($selected_chunk, 'Week') ?> value="Week"><?php _e("Week", "api-stats") ?></option>
 				</select>
 			</label>
 			&emsp;

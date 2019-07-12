@@ -6,10 +6,24 @@ if ( ! defined( 'WPINC' ) ) {
 
 function sg_api_tracker_activation(){
 	sg_api_tracker_create_db();
+
+	if (! wp_next_scheduled ( 'sg_api_stats_cron' )) {
+		wp_schedule_event(time(), 'hourly', 'sg_api_stats_cron');
+	}
+
 }
 
-function sg_api_tracker_deactivation(){
+add_action('sg_api_stats_cron', 'sg_api_clear_old_data');
 
+function sg_api_clear_old_data(){
+	
+}
+
+
+function sg_api_tracker_deactivation(){
+	if ( $scheduled = wp_next_scheduled ( 'sg_api_stats_cron' )) {
+		wp_unschedule_event( $scheduled, 'sg_api_stats_cron' );
+	}
 }
 
 function sg_api_tracker_uninstall(){

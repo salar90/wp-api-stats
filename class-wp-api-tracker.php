@@ -3,7 +3,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-class SG_API_Tracker{
+class SG_API_Stats{
 	private $settings = [];
 
 	function __construct() {
@@ -24,8 +24,8 @@ class SG_API_Tracker{
 	 *
 	 */
 	function rest_api_init(){
-		global $api_tracker_start_time;
-		$api_tracker_start_time = microtime(true);
+		global $api_stats_start_time;
+		$api_stats_start_time = microtime(true);
 	}
 
 	/**
@@ -39,8 +39,8 @@ class SG_API_Tracker{
 	 */
 	function pre_serve($served, $response, $request, $server){
 		global $wpdb;
-		global $api_tracker_start_time;
-		$table_name = $wpdb->prefix . 'sg_api_tracker_events'; 
+		global $api_stats_start_time;
+		$table_name = $wpdb->prefix . 'sg_api_stats_events'; 
 
 		$response_status = 0;
 		if(is_a($response,WP_HTTP_Response::class)){
@@ -52,7 +52,7 @@ class SG_API_Tracker{
 		$time = current_time('mysql');
 		
 		$end_time = microtime(true);
-		$time_taken = floor( ($end_time - $api_tracker_start_time)*1000 );
+		$time_taken = floor( ($end_time - $api_stats_start_time)*1000 );
 		
 
 		$new_entry = [
@@ -74,9 +74,9 @@ class SG_API_Tracker{
 	 */
 	function admin_menu(){
 		if( $this->settings['menu_mode'] == "SUBMENU" ){
-			add_submenu_page('tools.php' , __("API Tracker","api-tracker") , __("API Tracker","api-tracker") , 'manage_options' , 'api-tracker' , [$this,"admin_page"] );
+			add_submenu_page('tools.php' , __("API Stats","api-stats") , __("API Stats","api-stats") , 'manage_options' , 'api-stats' , [$this,"admin_page"] );
 		}else{
-			add_menu_page(__("API Tracker","api-tracker") , __("API Tracker","api-tracker") , "manage_options" , 'api-tracker' , [$this,"admin_page"] );
+			add_menu_page(__("API Stats","api-stats") , __("API Stats","api-stats") , "manage_options" , 'api-stats' , [$this,"admin_page"] );
 		}
 	}
 
@@ -89,7 +89,7 @@ class SG_API_Tracker{
 	}
 
 	function load_stats(){
-		$current_data = get_option("sg_api_tracker_requests",[]);
+		$current_data = get_option("sg_api_stats_requests",[]);
 	}
 
 

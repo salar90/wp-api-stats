@@ -21,9 +21,7 @@ function sg_api_clear_old_data(){
 
 
 function sg_api_stats_deactivation(){
-	if ( $scheduled = wp_next_scheduled ( 'sg_api_stats_cron' )) {
-		wp_unschedule_event( $scheduled, 'sg_api_stats_cron' );
-	}
+	wp_clear_scheduled_hook('sg_api_stats_cron');
 }
 
 function sg_api_stats_uninstall(){

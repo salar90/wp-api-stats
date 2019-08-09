@@ -5,6 +5,7 @@ if ( ! defined( 'WPINC' ) ) {
 
 class SG_API_Stats{
 	private $settings = [];
+	private $prepared_data = false;
 
 	function __construct() {
 		$this->settings["menu_mode"] = "SUBMENU";
@@ -13,9 +14,18 @@ class SG_API_Stats{
 
 	function register_hooks(){
 		add_action("admin_menu",[$this,"admin_menu"]);
+		
+		// Hooks for requests
 		add_filter( 'rest_pre_serve_request' , [$this,'pre_serve'] , 5, 4 );
 		add_action( 'rest_api_init' , [$this,'rest_api_init'] , 5 );
+
+		// prepare data for admin page
+		add_action( 'admin_print_scripts', [$this, 'add_js_data'] );
+
+		// enqueue js and css files
 		add_action( 'admin_enqueue_scripts', [$this, 'load_admin_style'] );
+
+		// inline styles
 		add_action( 'admin_print_styles-tools_page_api-stats', [$this, 'load_admin_inline_style']);
 	}
 
@@ -70,6 +80,103 @@ class SG_API_Stats{
 
 	}
 
+	function prepare_data(){
+		if($this->prepared_data){
+			return $this->prepared_data;
+		}
+
+		$current_date_from = filter_input(INPUT_POST, 'date-from', FILTER_SANITIZE_STRING);
+		$current_date_to = filter_input(INPUT_POST, 'date-to', FILTER_SANITIZE_STRING);
+		$selected_chunk =filter_input(INPUT_POST, 'chunk', FILTER_SANITIZE_STRING);
+
+		if(empty($current_date_from)){
+			$current_date_from = date('Y-m-d', time()- 24*3600);
+		}
+
+		if(empty($current_date_to)){
+			$current_date_to = date('Y-m-d',strtotime('today') );
+		}
+
+		if(empty($selected_chunk)){
+			$selected_chunk = 'Hour';
+		}
+
+
+		$duration = strtotime($current_date_to) - strtotime($current_date_from) + 3600*24;
+
+		$chunks = [
+			'Minute'	=> 60,
+			'Hour'		=> 3600,
+			'Day'		=> 3600*24,
+			'Week'		=> 3600*24*7
+		];
+
+
+		$chunkUp = [
+			'Minute'	=> 'Hour',
+			'Hour'		=> 'Day',
+			'Day'		=> 'Week'
+		];
+		while ( ($chunk_count = ceil( $duration / $chunks[$selected_chunk] )) > 3000){
+			if( array_key_exists($selected_chunk, $chunkUp) ){
+				$selected_chunk = $chunkUp[$selected_chunk];
+			}else{
+				break;
+			}
+		}
+
+
+		$methods = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'];
+
+		$start = strtotime($current_date_from);
+
+		global $wpdb;
+
+		$data['all'] = [];
+		$labels = [];
+
+
+		for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
+			
+			$ch_start = $i;
+			$ch_end = $ch_start + $chunks[$selected_chunk];
+			
+			$q_start = 	"'" . date("Y-m-d H:i:s", $ch_start) . "'";
+			$q_end = 	"'" .date("Y-m-d H:i:s", $ch_end) . "'";
+			
+			$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_stats_events WHERE time >= $q_start AND time < $q_end", OBJECT );
+			$count = count($results);
+
+			
+			foreach($methods as $method){
+				$c = 0;
+				foreach($results as $entry){
+					if( $entry->method == $method){
+						$c++;
+					}
+				}
+				$data[$method][] = $c;
+			}
+			
+			if( in_array($selected_chunk, ['Minute', 'Hour']) ){
+				$labels[] = date("H:i", $i);
+			}
+
+			if( in_array($selected_chunk, [ 'Day', 'Week']) ){
+				$labels[] = date("m-d H:i", $i);
+			}
+			
+			$data['all'][] = $count;
+			
+		}
+
+		$this->prepared_data = compact('data', 'current_date_from', 'current_date_to', 'selected_chunk', 'labels');
+
+		return $this->prepared_data;
+
+	}
+
+
 	/**
 	 * Admin menu setup
 	 */
@@ -85,7 +192,7 @@ class SG_API_Stats{
 	 * Display admin page contents
 	 */
 	function admin_page(){
-		$this->stats = $this->load_stats();
+		extract($this->prepare_data());
 		include __DIR__ . '/views/admin-panel.php';
 	}
 
@@ -93,8 +200,9 @@ class SG_API_Stats{
         if($hook != 'tools_page_api-stats') {
                 return;
         }
-		wp_enqueue_style( 'chartjs', plugins_url('assets/chartjs/Chart.min.css', __FILE__), array(), '2.8.0' );
+		wp_enqueue_style( 'chartjs-css', plugins_url('assets/chartjs/Chart.min.css', __FILE__), array(), '2.8.0' );
 		wp_enqueue_script('chartjs', plugins_url('assets/chartjs/Chart.min.js', __FILE__), array(), '2.8.0' );
+		wp_enqueue_script('api-stats-draw', plugins_url('assets/draw.js', __FILE__), array('chartjs'), '1.0', true );
 	}
 
 	function load_admin_inline_style(){
@@ -110,6 +218,17 @@ class SG_API_Stats{
 		';
 	}
 
+
+	function add_js_data(){
+		$screen = get_current_screen();
+		if($screen->id !== 'tools_page_api-stats'){
+			return;
+		}
+		$data_json = wp_json_encode($this->prepare_data());
+		echo "<script type='text/javascript'>\n";
+		echo 'var ApichartData = ' . $data_json . ';';
+		echo '</script>';
+	}
 
 
 }

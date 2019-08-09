@@ -48,7 +48,9 @@ $start = strtotime($current_date_from);
 global $wpdb;
 
 $data['all'] = [];
-$labels = range(1,$chunk_count);
+// $labels = range(1,$chunk_count);
+$labels = [];
+
 
 for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	
@@ -60,6 +62,15 @@ for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	
 	$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_stats_events WHERE time >= $q_start AND time < $q_end", OBJECT );
 	$count = count($results);
+
+	if( in_array($selected_chunk, ['Minute', 'Hour']) ){
+		$labels[] = date("H:i", $i);
+	}
+
+	if( in_array($selected_chunk, [ 'Day', 'Week']) ){
+		$labels[] = date("m-d H:i", $i);
+	}
+	
 	$data['all'][] = $count;
 	
 }

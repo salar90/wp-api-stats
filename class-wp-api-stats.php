@@ -89,10 +89,6 @@ class SG_API_Stats{
 		include __DIR__ . '/views/admin-panel.php';
 	}
 
-	function load_stats(){
-		$current_data = get_option("sg_api_stats_requests",[]);
-	}
-
 	function load_admin_style($hook) {
         if($hook != 'tools_page_api-stats') {
                 return;

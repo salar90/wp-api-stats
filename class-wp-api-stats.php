@@ -97,8 +97,8 @@ class SG_API_Stats{
         if($hook != 'tools_page_api-stats') {
                 return;
         }
-		wp_enqueue_style( 'chartjs', 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.css' );
-		wp_enqueue_script('chartjs', 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js');
+		wp_enqueue_style( 'chartjs', plugins_url('assets/chartjs/Chart.min.css', __FILE__), array(), '2.8.0' );
+		wp_enqueue_script('chartjs', plugins_url('assets/chartjs/Chart.min.js', __FILE__), array(), '2.8.0' );
 	}
 
 	function load_admin_inline_style(){

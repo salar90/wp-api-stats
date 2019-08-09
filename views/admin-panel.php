@@ -129,10 +129,10 @@ $json_data_all = json_encode($data['all']);
 	</div>
 
 
-	<canvas id="myChart" width="400" height="150"></canvas>
+	<canvas id="ApiChart" width="400" height="150"></canvas>
 	<script>
-	var ctx = document.getElementById('myChart').getContext('2d');
-	var myChart = new Chart(ctx, {
+	var ctx = document.getElementById('ApiChart').getContext('2d');
+	var ApiChart = new Chart(ctx, {
 		type: 'line',
 		data: {
 			labels: <?= $json_labels ?>,

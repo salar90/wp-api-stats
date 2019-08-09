@@ -89,8 +89,11 @@ class SG_API_Stats{
 		$current_date_to = filter_input(INPUT_POST, 'date-to', FILTER_SANITIZE_STRING);
 		$selected_chunk =filter_input(INPUT_POST, 'chunk', FILTER_SANITIZE_STRING);
 
+		//timezone offset
+		$tz_offset = get_option( 'gmt_offset', 0 ) * HOUR_IN_SECONDS;
+
 		if(empty($current_date_from)){
-			$current_date_from = date('Y-m-d', time()- 24*3600);
+			$current_date_from = date('Y-m-d', time() - 24*3600);
 		}
 
 		if(empty($current_date_to)){
@@ -129,7 +132,6 @@ class SG_API_Stats{
 		$methods = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'];
 
 		$start = strtotime($current_date_from);
-
 		global $wpdb;
 
 		$data['all'] = [];
@@ -138,7 +140,7 @@ class SG_API_Stats{
 
 		for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 			
-			$ch_start = $i;
+			$ch_start = $i - $tz_offset ;
 			$ch_end = $ch_start + $chunks[$selected_chunk];
 			
 			$q_start = 	"'" . date("Y-m-d H:i:s", $ch_start) . "'";

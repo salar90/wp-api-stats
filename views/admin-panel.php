@@ -98,17 +98,6 @@ $json_data_all = json_encode($data['all']);
 	<hr class="wp-header-end">
 	<br>
 
-	<style>
-	.at-controls{
-		border: 1px solid #CCC;
-		background: #EEEEEE;
-		padding: 10px;
-		border-radius: 5px;
-	}
-	</style>
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.css" />
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"></script>
-
 	<div class="at-controls" dir="ltr">
 		<form action="" method="POST">
 			<label>

@@ -15,6 +15,8 @@ class SG_API_Stats{
 		add_action("admin_menu",[$this,"admin_menu"]);
 		add_filter( 'rest_pre_serve_request' , [$this,'pre_serve'] , 5, 4 );
 		add_action( 'rest_api_init' , [$this,'rest_api_init'] , 5 );
+		add_action( 'admin_enqueue_scripts', [$this, 'load_admin_style'] );
+		add_action( 'admin_print_styles-tools_page_api-stats', [$this, 'load_admin_inline_style']);
 	}
 
 
@@ -89,6 +91,27 @@ class SG_API_Stats{
 
 	function load_stats(){
 		$current_data = get_option("sg_api_stats_requests",[]);
+	}
+
+	function load_admin_style($hook) {
+        if($hook != 'tools_page_api-stats') {
+                return;
+        }
+		wp_enqueue_style( 'chartjs', 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.css' );
+		wp_enqueue_script('chartjs', 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js');
+	}
+
+	function load_admin_inline_style(){
+		echo '
+		<style type="text/css">
+		.at-controls{
+			border: 1px solid #CCC;
+			background: #EEEEEE;
+			padding: 10px;
+			border-radius: 5px;
+		}
+		</style>
+		';
 	}
 
 

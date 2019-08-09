@@ -7,7 +7,6 @@ class SG_API_Stats{
 	private $settings = [];
 
 	function __construct() {
-		date_default_timezone_set('UTC');
 		$this->settings["menu_mode"] = "SUBMENU";
 		$this->register_hooks();
 	}
@@ -49,7 +48,7 @@ class SG_API_Stats{
 		if(is_a($response,WP_Error::class)){
 			$response_status = $response->get_error_code();
 		}
-		$time = current_time('mysql');
+		$time = current_time('mysql', true);
 		
 		$end_time = microtime(true);
 		$time_taken = floor( ($end_time - $api_stats_start_time)*1000 );

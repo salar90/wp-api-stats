@@ -87,7 +87,7 @@ for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	$data['all'][] = $count;
 	
 }
-var_dump($data);
+
 $json_labels = json_encode($labels);
 $json_data_all = json_encode($data['all']);
 

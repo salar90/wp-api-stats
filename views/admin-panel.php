@@ -43,12 +43,14 @@ while ( ($chunk_count = ceil( $duration / $chunks[$selected_chunk] )) > 3000){
 	}
 }
 
+
+$methods = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'];
+
 $start = strtotime($current_date_from);
 
 global $wpdb;
 
 $data['all'] = [];
-// $labels = range(1,$chunk_count);
 $labels = [];
 
 
@@ -63,6 +65,17 @@ for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_stats_events WHERE time >= $q_start AND time < $q_end", OBJECT );
 	$count = count($results);
 
+	
+	foreach($methods as $method){
+		$c = 0;
+		foreach($results as $entry){
+			if( $entry->method == $method){
+				$c++;
+			}
+		}
+		$data[$method][] = $c;
+	}
+	
 	if( in_array($selected_chunk, ['Minute', 'Hour']) ){
 		$labels[] = date("H:i", $i);
 	}
@@ -74,6 +87,7 @@ for($i=$start , $j=1; $j <= $chunk_count; $i+=$chunks[$selected_chunk] , $j++ ){
 	$data['all'][] = $count;
 	
 }
+var_dump($data);
 $json_labels = json_encode($labels);
 $json_data_all = json_encode($data['all']);
 
@@ -133,11 +147,51 @@ $json_data_all = json_encode($data['all']);
 		type: 'line',
 		data: {
 			labels: <?= $json_labels ?>,
-			datasets: [{
-				label: 'Requests',
-				data: <?= $json_data_all ?>,
-				
-			}]
+			datasets: [
+				{
+					label: 'All',
+					data: <?= $json_data_all ?>,
+					borderColor : '#CCCCCC',
+					backgroundColor : '#00000000',
+					borderWidth: 1,
+            		hidden: true,
+				},
+				{
+					label: 'GET',
+					data: <?= json_encode($data['GET']) ?>,
+					borderColor : '#44EE44',
+					backgroundColor : '#44EE4433',
+					borderWidth: 1,
+				},
+				{
+					label: 'POST',
+					data: <?= json_encode($data['POST']) ?>,
+					borderColor : '#883997',
+					backgroundColor : '#88399733',
+					borderWidth: 1,
+				},
+				{
+					label: 'PUT',
+					data: <?= json_encode($data['PUT']) ?>,
+					borderColor : '#ffb300',
+					backgroundColor : '#ffb30033',
+					borderWidth: 1,
+				},
+				{
+					label: 'PATCH',
+					data: <?= json_encode($data['PATCH']) ?>,
+					borderColor: '#f5fd67',
+					backgroundColor : '#f5fd6733',
+					borderWidth: 1,
+				},
+				{
+					label: 'DELETE',
+					data: <?= json_encode($data['DELETE']) ?>,
+					borderColor : '#ab000d',
+					backgroundColor : '#ab000d44',
+					borderWidth: 1,
+				}
+			]
 		},
 		options: {
 			scales: {

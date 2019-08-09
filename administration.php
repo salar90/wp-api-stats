@@ -16,7 +16,15 @@ function sg_api_stats_activation(){
 add_action('sg_api_stats_cron', 'sg_api_clear_old_data');
 
 function sg_api_clear_old_data(){
+	global $wpdb;
+
+	// SQL time format
+	$old_time = gmdate( 'Y-m-d H:i:s', ( time() - ( 30 * DAY_IN_SECONDS ) ) );
 	
+	$table_name = $wpdb->prefix . 'sg_api_stats_events'; 
+	$wpdb->query(
+		"DELETE FROM " . $table_name . " WHERE time < \"" . $old_time ."\""
+	  );
 }
 
 

@@ -4,7 +4,7 @@
  * Plugin Name:       WP API Stats
  * Plugin URI:        https://github.com/salar90/wp-api-stats
  * Description:       Track and Analyse WordPress API calls and requests.
- * Version:           1.0.0
+ * Version:           1.2.0
  * Author:            Salar Gholizadeh
  * Author URI:        http://salar.one/
  * License:           GPL-2.0+

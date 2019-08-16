@@ -1,16 +1,15 @@
 <?php
-/**
- * @wordpress-plugin
- * Plugin Name:       WP API Stats
- * Plugin URI:        https://github.com/salar90/wp-api-stats
- * Description:       Track and Analyse WordPress API calls and requests.
- * Version:           1.2.0
- * Author:            Salar Gholizadeh
- * Author URI:        http://salar.one/
- * License:           GPL-2.0+
- * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain:       api-stats
- * Domain Path:       /languages
+/*
+Plugin Name: WP API Stats
+Description: Track and Analyse WordPress API calls and requests.
+Author: Salar Gholizadeh
+Version: 1.2.0
+Plugin URI: https://github.com/salar90/wp-api-stats
+Author URI: http://salar.one/
+License: GNU General Public License v3.0
+License URI: http://www.gnu.org/licenses/gpl-3.0.txt
+Text Domain: api-stats
+Domain Path: /languages
  */
 
 

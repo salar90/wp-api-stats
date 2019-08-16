@@ -1,5 +1,5 @@
 === API Stats ===
-Contributors: salar90
+Contributors: salar6990
 Tags: API REST-API Statistics stats
 Requires at least: 4.4
 Tested up to: 5.2.2

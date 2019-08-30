@@ -16,6 +16,7 @@ API Stats allows you to view and monitor API requests to your website on a clear
 you can easily view statistics in different time spans and durations.
 
 = API Stat's main Features =
+* Record any route from all plugins (e.g WooCommerce) and Wordpress core
 * Filter API requests by date
 * Adjust duration of points
 * Show/Filter known request types such as GET, POST, PUT, PATCH, DELETE,...

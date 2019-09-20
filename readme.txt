@@ -23,3 +23,6 @@ you can easily view statistics in different time spans and durations.
 * more comming soon...
 
 You can view this project at [API stat's Github page](https://github.com/salar90/wp-api-stats)
+
+== Screenshots ==
+1. Statistics Page

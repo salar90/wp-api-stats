@@ -1,0 +1,17 @@
+.api-stats-table{
+    border: 1px solid #555555;
+    border-collapse: collapse;
+
+    td, th{
+        border: 1px solid #555555;
+        padding: .5rem;
+    }
+
+    th{
+        background-color: #FFFFFF;
+    }
+    td{
+        background-color: #F7F7F7;
+    }
+
+}

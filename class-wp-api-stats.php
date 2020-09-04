@@ -97,7 +97,7 @@ class SG_API_Stats{
 		}
 
 		if(empty($current_date_to)){
-			$current_date_to = date('Y-m-d',strtotime('today') );
+			$current_date_to = date('Y-m-d 23:59:59',strtotime('today') );
 		}
 
 		if(empty($selected_chunk)){
@@ -147,16 +147,16 @@ class SG_API_Stats{
 			$q_end = 	"'" .date("Y-m-d H:i:s", $ch_end) . "'";
 			
 			$results = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}sg_api_stats_events WHERE time >= $q_start AND time < $q_end", OBJECT );
-			$count = count($results);
+			$count = 0;
 
-			
 			foreach($methods as $method){
 				$c = 0;
 				foreach($results as $entry){
 					if( $entry->method == $method){
-						$c++;
+						$c+=1;
 					}
 				}
+				$count += $c;
 				$data[$method][] = $c;
 			}
 			
@@ -171,8 +171,21 @@ class SG_API_Stats{
 			$data['all'][] = $count;
 			
 		}
+		$query = "SELECT 
+		e.method,
+		e.route,
+		COUNT(e.id) AS count,
+		AVG(e.duration) as average_duration
 
-		$this->prepared_data = compact('data', 'current_date_from', 'current_date_to', 'selected_chunk', 'labels');
+		FROM {$wpdb->prefix}sg_api_stats_events e
+
+		WHERE e.time >= '$current_date_from' AND e.time < '$current_date_to'
+		GROUP BY e.method, e.route
+		ORDER BY count desc			
+		";
+		$tableData = $wpdb->get_results($query, OBJECT );
+
+		$this->prepared_data = compact('data','tableData', 'current_date_from', 'current_date_to', 'selected_chunk', 'labels');
 
 		return $this->prepared_data;
 
@@ -196,6 +209,7 @@ class SG_API_Stats{
 	function admin_page(){
 		extract($this->prepare_data());
 		include __DIR__ . '/views/admin-panel.php';
+		include __DIR__ . '/views/table.php';
 	}
 
 	function load_admin_style($hook) {
@@ -205,6 +219,8 @@ class SG_API_Stats{
 		wp_enqueue_style( 'chartjs-css', plugins_url('assets/chartjs/Chart.min.css', __FILE__), array(), '2.8.0' );
 		wp_enqueue_script('chartjs', plugins_url('assets/chartjs/Chart.min.js', __FILE__), array(), '2.8.0' );
 		wp_enqueue_script('api-stats-draw', plugins_url('assets/draw.js', __FILE__), array('chartjs'), '1.0', true );
+		wp_enqueue_style( 'api-stats', plugins_url('assets/api-stats.css', __FILE__));
+
 	}
 
 	function load_admin_inline_style(){

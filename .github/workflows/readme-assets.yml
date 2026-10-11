@@ -1,0 +1,58 @@
+# Push readme.txt / .wordpress-org assets to SVN WITHOUT a new release
+# (e.g. bumping "Tested up to"). Run manually from the Actions tab.
+#
+# Updates trunk/readme.txt, tags/<Stable tag>/readme.txt and assets/.
+# Refuses to run if src/ code differs from the published stable tag in
+# anything other than readme.txt, so code can't sneak out unreleased.
+name: Update readme & assets on WordPress.org
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SVN
+        run: sudo apt-get update && sudo apt-get install -y subversion
+
+      - name: Build
+        run: bash bin/build.sh
+
+      - name: Sync readme + assets
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          SLUG=wp-api-stats
+          SVN_URL="https://plugins.svn.wordpress.org/$SLUG"
+          STABLE=$(grep -m1 -iE '^Stable tag:' src/readme.txt | awk '{print $NF}' | tr -d '\r')
+
+          svn checkout --depth immediates "$SVN_URL" svn
+          cd svn
+          svn update --set-depth infinity trunk assets
+          svn update --set-depth infinity "tags/$STABLE" || { echo "::error::tags/$STABLE does not exist in SVN; release it first"; exit 1; }
+
+          # Safety: code in dist must match the stable tag, apart from readme.txt.
+          if ! diff -rq --exclude=.svn --exclude=readme.txt --exclude="*.scss" --exclude=.gitignore "../dist/$SLUG" "tags/$STABLE"; then
+            echo "::error::src/ code differs from released $STABLE. Tag a new release instead."
+            exit 1
+          fi
+
+          cp "../dist/$SLUG/readme.txt" trunk/readme.txt
+          cp "../dist/$SLUG/readme.txt" "tags/$STABLE/readme.txt"
+          rsync -rc --delete --exclude=.svn ../.wordpress-org/ assets/
+
+          svn add --force assets > /dev/null
+          svn status assets | grep '^!' | awk '{print $2}' | xargs -r svn rm
+          for f in assets/*.png; do svn propset svn:mime-type image/png "$f" >/dev/null 2>&1 || true; done
+          for f in assets/*.jpg; do [ -e "$f" ] && svn propset svn:mime-type image/jpeg "$f" >/dev/null; done || true
+
+          svn status
+          if [ -z "$(svn status)" ]; then echo "Nothing to update."; exit 0; fi
+          svn commit -m "Update readme/assets from GitHub ${GITHUB_SHA::7}" \
+            --no-auth-cache --non-interactive \
+            --username "$SVN_USERNAME" --password "$SVN_PASSWORD"

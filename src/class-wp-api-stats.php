@@ -1,293 +1,297 @@
 <?php
-if (!defined('WPINC')) {
+if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-class SG_API_Stats
-{
-	private $settings = [];
+class SG_API_Stats {
+
+	const PAGE_SLUG  = 'api-stats';
+	const PAGE_HOOK  = 'tools_page_api-stats';
+	const MAX_POINTS = 3000;
+	const MAX_ROUTES = 200;
+
+	/** Chunk name => length in seconds. */
+	const CHUNKS = array(
+		'Minute' => MINUTE_IN_SECONDS,
+		'Hour'   => HOUR_IN_SECONDS,
+		'Day'    => DAY_IN_SECONDS,
+		'Week'   => WEEK_IN_SECONDS,
+	);
+
+	const METHODS = array( 'GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS' );
+
+	private $settings      = array();
 	private $prepared_data = false;
 
-	function __construct()
-	{
-		$this->settings["menu_mode"] = "SUBMENU";
+	/** Microtime at which the current REST request started. */
+	private $start_time = null;
+
+	public function __construct() {
+		$this->settings['menu_mode'] = 'SUBMENU';
 		$this->register_hooks();
 	}
 
-	function register_hooks()
-	{
-		add_action("admin_menu", [$this, "admin_menu"]);
+	public function register_hooks() {
+		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 
 		// Hooks for requests
-		add_filter('rest_pre_serve_request', [$this, 'pre_serve'], 5, 4);
-		add_action('rest_api_init', [$this, 'rest_api_init'], 5);
+		add_filter( 'rest_pre_serve_request', array( $this, 'pre_serve' ), 5, 3 );
+		add_action( 'rest_api_init', array( $this, 'rest_api_init' ), 5 );
 
-		// prepare data for admin page
-		add_action('admin_print_scripts', [$this, 'add_js_data']);
-
-		// enqueue js and css files
-		add_action('admin_enqueue_scripts', [$this, 'load_admin_style']);
-
-		// inline styles
-		add_action('admin_print_styles-tools_page_api-stats', [$this, 'load_admin_inline_style']);
+		// enqueue js and css files, and pass chart data to js
+		add_action( 'admin_enqueue_scripts', array( $this, 'load_admin_assets' ) );
 	}
 
+	/**
+	 * Name of the events table.
+	 */
+	public static function table_name() {
+		global $wpdb;
+		return $wpdb->prefix . 'sg_api_stats_events';
+	}
 
 	/**
 	 * API init (the very beginning of a request)
-	 *
 	 */
-	function rest_api_init()
-	{
-		global $api_stats_start_time;
-		$api_stats_start_time = microtime(true);
+	public function rest_api_init() {
+		$this->start_time = microtime( true );
 	}
 
 	/**
 	 * Things to do just before echoing the API response.
 	 *
-	 *
-	 * @param bool             $served  Whether the request has already been served.
-	 * @param WP_HTTP_Response $response  Result to send to the client. Usually a WP_REST_Response.
-	 * @param WP_REST_Request  $request Request used to generate the response.
-	 * @param WP_REST_Server   $server    Server instance.
+	 * @param bool             $served   Whether the request has already been served.
+	 * @param WP_HTTP_Response $response Result to send to the client. Usually a WP_REST_Response.
+	 * @param WP_REST_Request  $request  Request used to generate the response.
 	 */
-	function pre_serve($served, $response, $request, $server)
-	{
+	public function pre_serve( $served, $response, $request ) {
 		global $wpdb;
-		global $api_stats_start_time;
-		$table_name = $wpdb->prefix . 'sg_api_stats_events';
 
 		$response_status = 0;
-		if (is_a($response, WP_HTTP_Response::class)) {
+		if ( is_a( $response, WP_HTTP_Response::class ) ) {
 			$response_status = $response->get_status();
 		}
-		if (is_a($response, WP_Error::class)) {
+		if ( is_a( $response, WP_Error::class ) ) {
 			$response_status = $response->get_error_code();
 		}
-		$time = current_time('mysql', true);
 
-		$end_time = microtime(true);
-		$time_taken = floor(($end_time - $api_stats_start_time) * 1000);
+		$start_time = $this->start_time ? $this->start_time : microtime( true );
+		$time_taken = floor( ( microtime( true ) - $start_time ) * 1000 );
 
-
-		$new_entry = [
-			'method' => $request->get_method(),
-			'route' => $request->get_route(),
-			'respose_code' => $response_status,
-			'time' => $time,
-			'duration' => $time_taken,
-			// 'user' => $user->ID  // Todo: detect user
-		];
-		$wpdb->insert($table_name, $new_entry);
+		// Route and method come straight from the client: they are stored as-is
+		// and must always be escaped on output.
+		$wpdb->insert(
+			self::table_name(),
+			array(
+				'method'       => substr( $request->get_method(), 0, 20 ),
+				'route'        => substr( $request->get_route(), 0, 2000 ),
+				'respose_code' => substr( (string) $response_status, 0, 45 ),
+				'time'         => current_time( 'mysql', true ),
+				'duration'     => $time_taken,
+			),
+			array( '%s', '%s', '%s', '%s', '%d' )
+		);
 
 		return $served;
 	}
 
-	function prepare_data()
-	{
-		if ($this->prepared_data) {
+	/**
+	 * Validate a Y-m-d date string from the request.
+	 *
+	 * @return string|null The date, or null if missing/invalid.
+	 */
+	private static function read_date_param( $key ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter.
+		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+		$date  = DateTimeImmutable::createFromFormat( '!Y-m-d', $value, wp_timezone() );
+		if ( ! $date || $date->format( 'Y-m-d' ) !== $value ) {
+			return null;
+		}
+		return $value;
+	}
+
+	public function prepare_data() {
+		global $wpdb;
+
+		if ( $this->prepared_data ) {
 			return $this->prepared_data;
 		}
 
-		$current_date_from = sanitize_text_field($_POST['date-from'] ?? '');
-		$current_date_to = sanitize_text_field($_POST['date-to'] ?? '');
-		$selected_chunk = sanitize_text_field($_POST['chunk'] ?? '');
+		$tz    = wp_timezone();
+		$today = new DateTimeImmutable( 'today', $tz );
 
-		//timezone offset
-		$tz_offset = get_option('gmt_offset', 0) * HOUR_IN_SECONDS;
-
-		if (empty($current_date_from)) {
-			$current_date_from = date('Y-m-d', time() - 24 * 3600);
+		$current_date_from = self::read_date_param( 'date-from' );
+		$current_date_to   = self::read_date_param( 'date-to' );
+		if ( null === $current_date_from ) {
+			$current_date_from = $today->modify( '-1 day' )->format( 'Y-m-d' );
+		}
+		if ( null === $current_date_to ) {
+			$current_date_to = $today->format( 'Y-m-d' );
+		}
+		if ( $current_date_to < $current_date_from ) {
+			list( $current_date_from, $current_date_to ) = array( $current_date_to, $current_date_from );
 		}
 
-		if (empty($current_date_to)) {
-			$current_date_to = date('Y-m-d 23:59:59', strtotime('today'));
-		}
-
-		if (empty($selected_chunk)) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter.
+		$selected_chunk = isset( $_GET['chunk'] ) ? sanitize_text_field( wp_unslash( $_GET['chunk'] ) ) : '';
+		if ( ! array_key_exists( $selected_chunk, self::CHUNKS ) ) {
 			$selected_chunk = 'Hour';
 		}
 
+		// Range is [from 00:00, to+1 day 00:00) in the site's timezone.
+		$range_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $current_date_from, $tz );
+		$range_end   = DateTimeImmutable::createFromFormat( '!Y-m-d', $current_date_to, $tz )->modify( '+1 day' );
+		$start_ts    = $range_start->getTimestamp();
+		$duration    = $range_end->getTimestamp() - $start_ts;
 
-		$duration = strtotime($current_date_to) - strtotime($current_date_from) + 3600 * 24;
-
-		$chunks = [
-			'Minute'	=> 60,
-			'Hour'		=> 3600,
-			'Day'		=> 3600 * 24,
-			'Week'		=> 3600 * 24 * 7
-		];
-
-
-		$chunkUp = [
-			'Minute'	=> 'Hour',
-			'Hour'		=> 'Day',
-			'Day'		=> 'Week'
-		];
-		while (($chunk_count = ceil($duration / $chunks[$selected_chunk])) > 3000) {
-			if (array_key_exists($selected_chunk, $chunkUp)) {
-				$selected_chunk = $chunkUp[$selected_chunk];
-			} else {
+		// Grow the chunk size until the number of points is manageable.
+		$chunk_names = array_keys( self::CHUNKS );
+		while ( ceil( $duration / self::CHUNKS[ $selected_chunk ] ) > self::MAX_POINTS ) {
+			$next = array_search( $selected_chunk, $chunk_names, true ) + 1;
+			if ( ! isset( $chunk_names[ $next ] ) ) {
 				break;
 			}
+			$selected_chunk = $chunk_names[ $next ];
+		}
+		$chunk_seconds = self::CHUNKS[ $selected_chunk ];
+		$chunk_count   = (int) ceil( $duration / $chunk_seconds );
+
+		// The `time` column holds UTC.
+		$utc_start = gmdate( 'Y-m-d H:i:s', $start_ts );
+		$utc_end   = gmdate( 'Y-m-d H:i:s', $range_end->getTimestamp() );
+		$table     = self::table_name();
+
+		// One grouped query for the whole chart instead of one per point.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is not user input.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT method, FLOOR( TIMESTAMPDIFF( SECOND, %s, `time` ) / %d ) AS bucket, COUNT(*) AS c
+				FROM `$table`
+				WHERE `time` >= %s AND `time` < %s
+				GROUP BY bucket, method",
+				$utc_start,
+				$chunk_seconds,
+				$utc_start,
+				$utc_end
+			)
+		);
+		// phpcs:enable
+
+		$data = array( 'all' => array_fill( 0, $chunk_count, 0 ) );
+		foreach ( self::METHODS as $method ) {
+			$data[ $method ] = array_fill( 0, $chunk_count, 0 );
+		}
+		foreach ( $rows as $row ) {
+			$bucket = (int) $row->bucket;
+			if ( $bucket < 0 || $bucket >= $chunk_count ) {
+				continue;
+			}
+			if ( isset( $data[ $row->method ] ) ) {
+				$data[ $row->method ][ $bucket ] += (int) $row->c;
+			}
+			$data['all'][ $bucket ] += (int) $row->c;
 		}
 
-
-		$methods = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS'];
-
-		$start = strtotime($current_date_from);
-		global $wpdb;
-
-		$data['all'] = [];
-		$labels = [];
-
-
-		for ($i = $start, $j = 1; $j <= $chunk_count; $i += $chunks[$selected_chunk], $j++) {
-
-			$ch_start = $i - $tz_offset;
-			$ch_end = $ch_start + $chunks[$selected_chunk];
-
-			$q_start = 	"'" . date("Y-m-d H:i:s", $ch_start) . "'";
-			$q_end = 	"'" . date("Y-m-d H:i:s", $ch_end) . "'";
-
-			$results = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}sg_api_stats_events WHERE time >= $q_start AND time < $q_end", OBJECT);
-			$count = 0;
-
-			foreach ($methods as $method) {
-				$c = 0;
-				foreach ($results as $entry) {
-					if ($entry->method == $method) {
-						$c += 1;
-					}
-				}
-				$count += $c;
-				$data[$method][] = $c;
-			}
-
-			if (in_array($selected_chunk, ['Minute', 'Hour'])) {
-				$labels[] = date("H:i", $i);
-			}
-
-			if (in_array($selected_chunk, ['Day', 'Week'])) {
-				$labels[] = date("m-d H:i", $i);
-			}
-
-			$data['all'][] = $count;
+		$multi_day = $duration > DAY_IN_SECONDS;
+		if ( in_array( $selected_chunk, array( 'Minute', 'Hour' ), true ) ) {
+			$label_format = $multi_day ? 'm-d H:i' : 'H:i';
+		} else {
+			$label_format = 'Y-m-d';
 		}
-		$query = "SELECT 
-		e.method,
-		e.route,
-		COUNT(e.id) AS count,
-		AVG(e.duration) as average_duration
+		$labels = array();
+		for ( $i = 0; $i < $chunk_count; $i++ ) {
+			$labels[] = wp_date( $label_format, $start_ts + $i * $chunk_seconds, $tz );
+		}
 
-		FROM {$wpdb->prefix}sg_api_stats_events e
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is not user input.
+		$tableData = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT method, route, COUNT(id) AS count, AVG(duration) AS average_duration
+				FROM `$table`
+				WHERE `time` >= %s AND `time` < %s
+				GROUP BY method, route
+				ORDER BY count DESC
+				LIMIT %d",
+				$utc_start,
+				$utc_end,
+				self::MAX_ROUTES
+			)
+		);
+		// phpcs:enable
 
-		WHERE e.time >= '$current_date_from' AND e.time < '$current_date_to'
-		GROUP BY e.method, e.route
-		ORDER BY count desc			
-		";
-		$tableData = $wpdb->get_results($query, OBJECT);
-
-		$this->prepared_data = compact('data', 'tableData', 'current_date_from', 'current_date_to', 'selected_chunk', 'labels');
+		$this->prepared_data = compact( 'data', 'tableData', 'current_date_from', 'current_date_to', 'selected_chunk', 'labels' );
 
 		return $this->prepared_data;
 	}
 
-	private function get_db_and_table_name()
-	{
+	/**
+	 * Size of the events table in MB, or null if unknown.
+	 */
+	public function getDataSize() {
 		global $wpdb;
-		$database_name = $wpdb->dbname;
-		$table_name = $wpdb->prefix . 'sg_api_stats_events';
-		return [$database_name, $table_name];
-	}
 
-	public function getDataSize()
-	{
-		try{
-			global $wpdb;
-			$database_name = $this->get_db_and_table_name()[0];
-			$table_name = $this->get_db_and_table_name()[1];
-	
-			$query = "SELECT 
-			table_name AS `Table`, 
-			round(((data_length + index_length) / 1024 / 1024), 2) `size_in_mb` 
-				FROM information_schema.TABLES 
-				WHERE `table_schema` = \"$database_name\" AND `table_name` = \"$table_name\";";
-	
-			$results = $wpdb->get_results($query);	
-			if(!count($results)){
-				throw new \Exception('no results from information_schema');
-			}
-			return $results[0]->size_in_mb;
-		}catch(\Exception $e){
-			return null;
-		}
-	}
+		$size = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT ROUND( ( data_length + index_length ) / 1024 / 1024, 2 )
+				FROM information_schema.TABLES
+				WHERE table_schema = %s AND table_name = %s',
+				$wpdb->dbname,
+				self::table_name()
+			)
+		);
 
+		return $size;
+	}
 
 	/**
 	 * Admin menu setup
 	 */
-	function admin_menu()
-	{
-		if ($this->settings['menu_mode'] == "SUBMENU") {
-			add_submenu_page('tools.php', __("API Stats", "api-stats"), __("API Stats", "api-stats"), 'manage_options', 'api-stats', [$this, "admin_page"]);
+	public function admin_menu() {
+		if ( 'SUBMENU' === $this->settings['menu_mode'] ) {
+			add_submenu_page( 'tools.php', __( 'API Stats', 'wp-api-stats' ), __( 'API Stats', 'wp-api-stats' ), 'manage_options', self::PAGE_SLUG, array( $this, 'admin_page' ) );
 		} else {
-			add_menu_page(__("API Stats", "api-stats"), __("API Stats", "api-stats"), "manage_options", 'api-stats', [$this, "admin_page"]);
+			add_menu_page( __( 'API Stats', 'wp-api-stats' ), __( 'API Stats', 'wp-api-stats' ), 'manage_options', self::PAGE_SLUG, array( $this, 'admin_page' ) );
 		}
 	}
 
 	/**
 	 * Display admin page contents
 	 */
-	function admin_page()
-	{
-		extract($this->prepare_data());
+	public function admin_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'wp-api-stats' ) );
+		}
+
+		extract( $this->prepare_data() ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract
 		include __DIR__ . '/views/admin-panel.php';
 		include __DIR__ . '/views/table.php';
 
-		if(!is_null($data_size = $this->getDataSize())){			
-			$table_name = $this->get_db_and_table_name()[1];
-			echo "<br><hr><p>API events are stored in <strong>$table_name</strong> table. Size: <strong>$data_size MB</strong> </p>";
+		$data_size = $this->getDataSize();
+		if ( null !== $data_size ) {
+			echo '<br><hr><p>';
+			printf(
+				/* translators: 1: database table name, 2: size in MB */
+				esc_html__( 'API events are stored in %1$s table. Size: %2$s MB', 'wp-api-stats' ),
+				'<strong>' . esc_html( self::table_name() ) . '</strong>',
+				'<strong>' . esc_html( $data_size ) . '</strong>'
+			);
+			echo '</p>';
 		}
 	}
 
-	function load_admin_style($hook)
-	{
-		if ($hook != 'tools_page_api-stats') {
+	public function load_admin_assets( $hook ) {
+		if ( self::PAGE_HOOK !== $hook ) {
 			return;
 		}
-		wp_enqueue_style('chartjs-css', plugins_url('assets/chartjs/Chart.min.css', __FILE__), array(), '2.8.0');
-		wp_enqueue_script('chartjs', plugins_url('assets/chartjs/Chart.min.js', __FILE__), array(), '2.8.0');
-		wp_enqueue_script('api-stats-draw', plugins_url('assets/draw.js', __FILE__), array('chartjs'), '1.0', true);
-		wp_enqueue_style('api-stats', plugins_url('assets/api-stats.css', __FILE__));
-	}
+		wp_enqueue_style( 'chartjs-css', plugins_url( 'assets/chartjs/Chart.min.css', __FILE__ ), array(), '2.8.0' );
+		wp_enqueue_script( 'chartjs', plugins_url( 'assets/chartjs/Chart.min.js', __FILE__ ), array(), '2.8.0', false );
+		wp_enqueue_script( 'api-stats-draw', plugins_url( 'assets/draw.js', __FILE__ ), array( 'chartjs' ), SG_API_STATS_VERSION, true );
+		wp_enqueue_style( 'api-stats', plugins_url( 'assets/api-stats.css', __FILE__ ), array(), SG_API_STATS_VERSION );
 
-	function load_admin_inline_style()
-	{
-		echo '
-		<style type="text/css">
-		.at-controls{
-			border: 1px solid #CCC;
-			background: #EEEEEE;
-			padding: 10px;
-			border-radius: 5px;
-		}
-		</style>
-		';
-	}
-
-
-	function add_js_data()
-	{
-		$screen = get_current_screen();
-		if ($screen->id !== 'tools_page_api-stats') {
-			return;
-		}
-		$data_json = wp_json_encode($this->prepare_data());
-		echo "<script type='text/javascript'>\n";
-		echo 'var ApichartData = ' . $data_json . ';';
-		echo '</script>';
+		wp_add_inline_script(
+			'api-stats-draw',
+			'var ApichartData = ' . wp_json_encode( array_intersect_key( $this->prepare_data(), array_flip( array( 'data', 'labels' ) ) ) ) . ';',
+			'before'
+		);
 	}
 }

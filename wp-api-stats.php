@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: WP API Stats
-Description: Track and Analyse WordPress API calls and requests.
+Description: View and filter API calls to your website with details about Method, Path, Response time, and Count.
 Author: Salar Gholizadeh
-Version: 1.3.1
+Version: 1.4
 Plugin URI: https://github.com/salar90/wp-api-stats
 Author URI: http://salar.one/
 License: GNU General Public License v3.0

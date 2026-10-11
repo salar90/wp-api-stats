@@ -2,13 +2,13 @@
 Contributors: salar6990
 Tags: API REST-API Statistics stats
 Requires at least: 4.4
-Tested up to: 5.5.1
+Tested up to: 6.4.1
 Requires PHP: 5.6
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
-Stable Tag: 1.3.1
+Stable Tag: 1.4
 
-View API calls to your website
+View and filter API calls to your website with details about Method, Path, Response time, and Count.
 
 == Description ==
 Do you use WordPress's REST-API system to serve applications? 
@@ -26,3 +26,11 @@ You can view this project at [API stat's Github page](https://github.com/salar90
 
 == Screenshots ==
 1. Statistics Page
+
+
+== Changelog ==
+= 1.4 =
+* Update plugin description
+* Fix Input sanitization
+* Add Feature to display size of data stored in database for API events
+* Test with WP 6.4.1

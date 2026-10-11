@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<ruleset name="WP API Stats">
+	<file>./src</file>
+	<exclude-pattern>src/assets/chartjs/*</exclude-pattern>
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+
+	<config name="testVersion" value="7.2-"/>
+	<config name="minimum_wp_version" value="5.3"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<rule ref="WordPress-Extra">
+		<!-- Legacy file/function naming kept for backwards compatibility. -->
+		<exclude name="WordPress.Files.FileName"/>
+		<exclude name="WordPress.NamingConventions.ValidVariableName"/>
+		<exclude name="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid"/>
+	</rule>
+	<rule ref="WordPress.Security"/>
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array" value="wp-api-stats"/>
+		</properties>
+	</rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array" value="sg_api,wp_api_stats"/>
+		</properties>
+		<!-- Views are included from inside a method, so their variables are not globals. -->
+		<exclude-pattern>src/views/*</exclude-pattern>
+	</rule>
+</ruleset>

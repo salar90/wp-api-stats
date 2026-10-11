@@ -26,19 +26,22 @@ Tools → API Stats.
 - `assets/draw.js` (Chart.js 2.8 rendering), `assets/api-stats.scss` → `api-stats.css` (compiled by hand; scss is excluded from builds).
 - DB table: `{prefix}sg_api_stats_events` (id, user, time, duration, method, route, version, respose_code [sic]). Option `sg_api_stats_db_version`.
 
-## Conventions
-- Function/class prefix `sg_` / `SG_`. Text domain `api-stats` (note: differs from slug; wp.org expects the slug).
-- Keep `Requires at least` / `Requires PHP` / `Tested up to` in readme.txt honest.
-- Follow WordPress coding standards; escape output (`esc_html`, `esc_attr`), sanitize input, use `$wpdb->prepare`.
+## Checks (run before committing)
+- `composer install` once, then `vendor/bin/phpcs` (WordPress-Extra + Security + PHPCompatibility 7.2+, config in `phpcs.xml.dist`). Must be clean. `vendor/bin/phpcbf` auto-fixes style.
+- `php -l` on changed files; `bash bin/build.sh` before a release.
+- CI (`.github/workflows/lint.yml`) runs the same on push/PR.
 
-## Known issues / TODO (not fixed yet)
-- SQL built by string interpolation from `$_POST` dates in `prepare_data()` (table query) and in `sg_api_clear_old_data`: use `$wpdb->prepare`.
-- Filter form has no nonce / capability check on POST.
-- `prepare_data()` runs one SELECT per bucket (up to 3000 queries) and fetches `SELECT *`; should be a single GROUP BY query.
-- Table query compares local dates against UTC `time` column (chart applies tz offset, table doesn't).
-- `sg_api_stats_uninstall()` is empty: table, option and cron are left behind.
-- `Requires PHP: 5.6` but code uses `??` (PHP 7.0+).
-- Text domain `api-stats` ≠ slug `wp-api-stats`; no `languages/` folder despite `Domain Path`.
-- Request start time uses `rest_api_init`, which fires late-ish; `user` column never populated.
-- Admin footer line echoes `$table_name` / size unescaped.
+## Conventions
+- Prefix `sg_api` / `SG_API` for new globals (legacy `sg_init_api_stats` is grandfathered). Text domain `wp-api-stats` (= slug).
+- Minimum: WordPress 5.3 (uses `wp_timezone`, `wp_date`), PHP 7.2. Keep code 7.2-compatible.
+- Escape everything on output: `route` and `method` columns are attacker-controlled (any visitor can hit `/wp-json/<anything>`).
+- All SQL through `$wpdb->prepare`; the `time` column holds UTC, filters are in the site timezone.
+- Bump `SG_API_STATS_VERSION`, header `Version:` and readme `Stable tag:` together.
+
+## Known issues / TODO
+- Not yet smoke-tested on a live WordPress (no local WP install on the Windows box yet).
+- `Tested up to` in readme.txt is still 6.4.1; bump only after testing on current WP.
+- Request start time uses `rest_api_init`; `user` column is never populated; `version` column unused.
+- No DB schema upgrade routine (activation hook doesn't run on plugin update); fine while schema is unchanged.
 - Bundled Chart.js 2.8.0 is old.
+- Every REST request does a synchronous INSERT; no sampling/opt-out filter.

@@ -1,0 +1,19 @@
+{
+	"name": "salar90/wp-api-stats",
+	"description": "Dev tooling for the WP API Stats plugin (not shipped).",
+	"type": "project",
+	"license": "GPL-3.0-or-later",
+	"require-dev": {
+		"wp-coding-standards/wpcs": "^3.1",
+		"phpcompatibility/phpcompatibility-wp": "*"
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"scripts": {
+		"lint": "phpcs",
+		"lint:fix": "phpcbf"
+	}
+}

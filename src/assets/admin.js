@@ -34,15 +34,16 @@
 			.filter( function ( key ) {
 				return source[ key ] && sum( source[ key ] ) > 0;
 			} )
-			.map( function ( key ) {
+			.map( function ( key, index ) {
 				var color = SERIES[ mode ][ key ];
 				return {
 					label: key,
 					data: source[ key ],
 					borderColor: color,
-					backgroundColor: color + '33',
+					backgroundColor: color + '59',
 					borderWidth: 1.5,
-					fill: true,
+					// Stacked bands: each series fills down to the one below it, not to zero, so fills don't overlap.
+					fill: index === 0 ? 'origin' : '-1',
 					tension: 0.25,
 					pointRadius: 0,
 					pointHitRadius: 6,
@@ -168,7 +169,38 @@
 		}
 	}
 
+	// Lowering retention deletes older events immediately: say how many, and ask first.
+	function initRetention() {
+		var form = document.querySelector( '.api-stats-retention' );
+		if ( ! form || ! data || ! data.retention ) {
+			return;
+		}
+		form.addEventListener( 'submit', function ( e ) {
+			var current = data.retention.days;
+			var next = parseInt( form.elements.retention_days.value, 10 ) || 0;
+			if ( next === 0 || ( current !== 0 && next >= current ) ) {
+				return; // Keeping the same or more data deletes nothing.
+			}
+			var affected = 0;
+			Object.keys( data.retention.ages ).forEach( function ( age ) {
+				if ( parseInt( age, 10 ) >= next ) {
+					affected += data.retention.ages[ age ];
+				}
+			} );
+			if ( affected === 0 ) {
+				return;
+			}
+			var message = data.i18n.confirmRetention
+				.replace( '%1$s', affected.toLocaleString() )
+				.replace( '%2$s', next ) + '\n\n' + data.i18n.cannotRestore;
+			if ( ! window.confirm( message ) ) {
+				e.preventDefault();
+			}
+		} );
+	}
+
 	initChart();
 	initTable();
 	initPurge();
+	initRetention();
 }() );

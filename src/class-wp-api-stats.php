@@ -331,6 +331,28 @@ class SG_API_Stats {
 	}
 
 	/**
+	 * Number of stored events per age in whole days, for the "lowering retention" warning.
+	 *
+	 * @return array<int,int> Age in days => event count.
+	 */
+	public function getEventAges() {
+		global $wpdb;
+		$table = self::table_name();
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is not user input.
+				"SELECT TIMESTAMPDIFF( DAY, `time`, %s ) AS age, COUNT(*) AS c FROM `$table` GROUP BY age",
+				gmdate( 'Y-m-d H:i:s' )
+			)
+		);
+		$ages = array();
+		foreach ( $rows as $row ) {
+			$ages[ (int) $row->age ] = (int) $row->c;
+		}
+		return $ages;
+	}
+
+	/**
 	 * Admin menu setup
 	 */
 	public function admin_menu() {
@@ -368,9 +390,17 @@ class SG_API_Stats {
 
 		$days = isset( $_POST['retention_days'] ) ? absint( wp_unslash( $_POST['retention_days'] ) ) : SG_API_STATS_DEFAULT_RETENTION_DAYS;
 
+		$old_days                   = sg_api_stats_get_retention_days();
 		$settings                   = sg_api_stats_get_settings();
 		$settings['retention_days'] = min( $days, 3650 );
 		update_option( 'sg_api_stats_settings', $settings, false );
+
+		// A shorter retention takes effect right away (the page asked for confirmation),
+		// instead of whenever the hourly cron happens to run.
+		$new_days = sg_api_stats_get_retention_days();
+		if ( $new_days > 0 && ( 0 === $old_days || $new_days < $old_days ) ) {
+			sg_api_clear_old_data();
+		}
 
 		wp_safe_redirect( self::page_url( array( 'sg-notice' => 'saved' ) ) . '#api-stats-data' );
 		exit;
@@ -398,12 +428,19 @@ class SG_API_Stats {
 
 		$prepared = $this->prepare_data();
 		$js_data  = array(
-			'labels'  => $prepared['labels'],
-			'methods' => array_diff_key( $prepared['data'], array( 'all' => true ) ),
-			'status'  => $prepared['status'],
-			'i18n'    => array(
-				'requests'     => __( 'Requests', 'wp-api-stats' ),
-				'confirmPurge' => __( 'Delete ALL recorded API events? This cannot be undone.', 'wp-api-stats' ),
+			'labels'    => $prepared['labels'],
+			'methods'   => array_diff_key( $prepared['data'], array( 'all' => true ) ),
+			'status'    => $prepared['status'],
+			'retention' => array(
+				'days' => sg_api_stats_get_retention_days(),
+				'ages' => (object) $this->getEventAges(),
+			),
+			'i18n'      => array(
+				'requests'         => __( 'Requests', 'wp-api-stats' ),
+				'confirmPurge'     => __( 'Delete ALL recorded API events? This cannot be undone.', 'wp-api-stats' ),
+				/* translators: 1: number of events, 2: number of days */
+				'confirmRetention' => __( '%1$s events are older than %2$s days and will be deleted now.', 'wp-api-stats' ),
+				'cannotRestore'    => __( 'Deleted events cannot be restored, even if you increase the number of days again later.', 'wp-api-stats' ),
 			),
 		);
 		wp_add_inline_script( 'api-stats-admin', 'var ApiStatsData = ' . wp_json_encode( $js_data ) . ';', 'before' );

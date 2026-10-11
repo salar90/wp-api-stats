@@ -30,7 +30,7 @@ You can view this project on [GitHub](https://github.com/salar90/wp-api-stats).
 == Frequently Asked Questions ==
 
 = How long is data kept? =
-30 days by default. Change it under Tools → API Stats → Stored data. Set it to 0 to keep data forever (the page shows how big the table is). Old events are removed hourly. Developers can also set it in code:
+30 days by default. Change it under Tools → API Stats → Stored data. Set it to 0 to keep data forever (the page shows how big the table is). Old events are removed hourly. Lowering the number deletes older events right away, after a confirmation that tells you how many; deleted events can't be restored by raising the number again. Developers can also set it in code:
 
 `add_filter( 'sg_api_stats_retention_days', function () { return 90; } );`
 
@@ -61,7 +61,8 @@ Requests are grouped by the registered route they matched, so `/wp/v2/posts/1`, 
 Your site's timezone (Settings → General). Durations are measured from the start of REST API handling until the response is sent, in milliseconds.
 
 == Screenshots ==
-1. Statistics Page
+1. Stats page: summary, requests over time by HTTP method, routes grouped by route pattern, and data retention settings.
+2. Chart by response status (an incident with 5xx errors stands out) and routes by exact path, with labels added through the sg_api_stats_label filter.
 
 
 == Changelog ==
@@ -70,7 +71,7 @@ Your site's timezone (Settings → General). Durations are measured from the sta
 * New: chart breakdown by status class (2xx/3xx/4xx/5xx) in addition to HTTP method
 * New: routes grouped by registered route pattern, so /posts/1, /posts/2, ... count as one route (switchable to exact paths)
 * New: error counts and maximum duration per route
-* New: configurable data retention (0 = keep forever) and a "Delete all data" button
+* New: configurable data retention (0 = keep forever) and a "Delete all data" button; lowering retention asks for confirmation and shows how many events will be deleted
 * New: developer filters sg_api_stats_should_record, sg_api_stats_label and sg_api_stats_retention_days
 * Fix: event IDs could overflow after about 8.4 million recorded requests, which stopped recording
 * Performance: index on the event time column; old events are deleted in batches

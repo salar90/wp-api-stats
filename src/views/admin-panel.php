@@ -146,17 +146,26 @@ $notice = isset( $_GET['sg-notice'] ) ? sanitize_key( $_GET['sg-notice'] ) : '';
 				<div class="api-stats-segmented" role="group" aria-label="<?php esc_attr_e( 'Group routes', 'wp-api-stats' ); ?>">
 					<?php
 					$groups = array(
-						'pattern' => array( __( 'By pattern', 'wp-api-stats' ), __( 'Group requests by the registered route, e.g. /wp/v2/posts/(?P<id>[\d]+)', 'wp-api-stats' ) ),
-						'path'    => array( __( 'By exact path', 'wp-api-stats' ), __( 'Show every requested path separately, e.g. /wp/v2/posts/42', 'wp-api-stats' ) ),
+						'pattern' => array(
+							'label'       => __( 'By pattern', 'wp-api-stats' ),
+							'help'        => __( 'Requests are grouped by the route they matched: /wp/v2/posts/12 and /wp/v2/posts/57 count as one row, /wp/v2/posts/(?P<id>[\d]+). Requests that matched no route (404) are listed by path.', 'wp-api-stats' ),
+							'placeholder' => __( 'Filter, e.g. /wp/v2/posts', 'wp-api-stats' ),
+						),
+						'path'    => array(
+							'label'       => __( 'By exact path', 'wp-api-stats' ),
+							'help'        => __( 'Every requested path is its own row: /wp/v2/posts/12 and /wp/v2/posts/57 are listed separately. Labels set with the sg_api_stats_label filter are shown here.', 'wp-api-stats' ),
+							'placeholder' => __( 'Filter, e.g. /wp/v2/posts/12', 'wp-api-stats' ),
+						),
 					);
 					foreach ( $groups as $group_key => $group_info ) :
 						?>
-						<a class="button<?php echo $group === $group_key ? ' button-primary' : ''; ?>" href="<?php echo esc_url( SG_API_Stats::page_url( array_merge( $filter_args, array( 'group' => $group_key ) ) ) ); ?>" title="<?php echo esc_attr( $group_info[1] ); ?>"<?php echo $group === $group_key ? ' aria-current="true"' : ''; ?>><?php echo esc_html( $group_info[0] ); ?></a>
+						<a class="button<?php echo $group === $group_key ? ' button-primary' : ''; ?>" href="<?php echo esc_url( SG_API_Stats::page_url( array_merge( $filter_args, array( 'group' => $group_key ) ) ) ); ?>"<?php echo $group === $group_key ? ' aria-current="true"' : ''; ?>><?php echo esc_html( $group_info['label'] ); ?></a>
 					<?php endforeach; ?>
 				</div>
-				<input type="search" class="api-stats-search" placeholder="<?php esc_attr_e( 'Filter routes…', 'wp-api-stats' ); ?>" aria-label="<?php esc_attr_e( 'Filter routes', 'wp-api-stats' ); ?>">
+				<input type="search" class="api-stats-search" placeholder="<?php echo esc_attr( $groups[ $group ]['placeholder'] ); ?>" aria-label="<?php esc_attr_e( 'Filter routes', 'wp-api-stats' ); ?>">
 			</div>
 		</div>
+		<p class="description api-stats-group-help"><?php echo esc_html( $groups[ $group ]['help'] ); ?></p>
 
 		<?php if ( empty( $tableData ) ) : ?>
 			<p class="api-stats-empty"><?php esc_html_e( 'No API requests recorded in this period.', 'wp-api-stats' ); ?></p>
@@ -247,7 +256,7 @@ $notice = isset( $_GET['sg-notice'] ) ? sanitize_key( $_GET['sg-notice'] ) : '';
 				<?php esc_html_e( 'days', 'wp-api-stats' ); ?>
 				<button class="button"><?php esc_html_e( 'Save', 'wp-api-stats' ); ?></button>
 				<p class="description">
-					<?php esc_html_e( 'Older events are deleted hourly. Use 0 to keep everything (watch the table size).', 'wp-api-stats' ); ?>
+					<?php esc_html_e( 'Use 0 to keep everything (watch the table size). Lowering the number deletes older events right away; deleted events cannot be restored.', 'wp-api-stats' ); ?>
 					<?php if ( (int) $settings['retention_days'] !== $retention_days ) : ?>
 						<br><strong>
 						<?php

@@ -44,7 +44,6 @@ Tools → API Stats.
   (verify the `.sha512`), run it with Herd's PHP from the WP dir: `~/.config/herd/bin/php83/php.exe wp-cli.phar <cmd>`.
 - PHP: Herd `~/.config/herd/bin/php83` and `php74`; system CLI PHP 8.2 (`D:\Software\php-8.2`).
 - Admin-page checks over HTTP: create a throwaway admin with WP-CLI, log in with curl cookies, delete the user afterwards.
-- `C:\Users\Salar\Dev\wp-api-stats` is the old 1.4-era SVN checkout: obsolete, don't use.
 - On Ubuntu: symlink `src/` into any local WP's `wp-content/plugins/wp-api-stats`.
 
 ## Smoke test checklist

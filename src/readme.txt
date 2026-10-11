@@ -39,6 +39,7 @@ You can view this project at [API stat's Github page](https://github.com/salar90
 * Uninstalling the plugin now removes its database table, option and scheduled event
 * Text domain changed to wp-api-stats to match the plugin slug (enables wordpress.org translations)
 * Requires WordPress 5.3+ and PHP 7.2+
+* Tested with WordPress 7.1
 
 = 1.4 =
 * Update plugin description

@@ -13,7 +13,7 @@ Tools → API Stats.
 - Readme/asset-only updates → manual `.github/workflows/readme-assets.yml`.
 - wp.org listing images go in `.wordpress-org/` (`icon-256x256.png`, `screenshot-N.png`, `banner-772x250.png`, ...).
 - History note: v1.4 was originally released through SVN only and later imported into git (tag `v1.4`).
-- Default branch is `master`. Line endings: LF (enforced by `.gitattributes`).
+- Default branch is `main`. Line endings: LF (enforced by `.gitattributes`).
 
 ## Code map (`src/`)
 - `wp-api-stats.php`: plugin header, activation/deactivation/uninstall hooks, instantiates `SG_API_Stats` into global `$WP_API_Stats`.

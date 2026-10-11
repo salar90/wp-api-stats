@@ -33,7 +33,7 @@ New-Item -ItemType SymbolicLink -Path C:\path\to\wp-content\plugins\wp-api-stats
 
 1. Bump `Version:` in `src/wp-api-stats.php` **and** `Stable tag:` in `src/readme.txt`, add a changelog entry.
 2. `bash bin/build.sh` (fails if versions don't match) and test the zip.
-3. Commit, then `git tag v1.5 && git push origin master v1.5`.
+3. Commit, then `git tag v1.5 && git push origin main v1.5`.
 4. The **Deploy to WordPress.org** workflow pushes to SVN `trunk/`, `tags/1.5/` and `assets/`, and creates a GitHub release with the zip.
 
 Readme-only / asset-only change (e.g. bump *Tested up to*): commit, push, then run

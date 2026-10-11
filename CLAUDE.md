@@ -9,8 +9,11 @@ Tools → API Stats.
 - Plugin code lives in `src/`. Anything outside `src/` never ships.
 - `bash bin/build.sh` → `dist/wp-api-stats/` (+ zip). It fails if `Version:` in
   `src/wp-api-stats.php` ≠ `Stable tag:` in `src/readme.txt`.
-- Release = push tag `vX.Y` → `.github/workflows/deploy.yml` (10up deploy action, `BUILD_DIR=dist/wp-api-stats`).
-- Readme/asset-only updates → manual `.github/workflows/readme-assets.yml`.
+- Release: tag `vX.Y` and push (CI `release.yml` builds the zip for a GitHub release), then `bash bin/deploy.sh --commit`
+  publishes to SVN locally. Without `--commit` it is a dry run into `./svn`. `--readme-only` updates readme/assets of the
+  current stable tag without a new version.
+- SVN credentials are in git-ignored `.env` (`SVN_USERNAME`, `SVN_PASSWORD`). Never commit them, never put them in
+  GitHub secrets/workflows, never echo them. Publishing to wordpress.org ships to all users: get the user's explicit OK first.
 - wp.org listing images go in `.wordpress-org/` (`icon-256x256.png`, `screenshot-N.png`, `banner-772x250.png`, ...).
 - History note: v1.4 was originally released through SVN only and later imported into git (tag `v1.4`).
 - Default branch is `main`. Line endings: LF (enforced by `.gitattributes`).

@@ -13,7 +13,8 @@ src/              The plugin itself (exactly what ships). readme.txt lives here.
 .wordpress-org/   wp.org listing assets: icon, banners, screenshots (→ SVN assets/)
 bin/build.sh      Builds src/ → dist/wp-api-stats/ + dist/wp-api-stats-<ver>.zip
 dist/             Build output (git-ignored)
-.github/workflows CI deploy to SVN
+.github/workflows CI: lint, GitHub release on tags
+bin/deploy.sh     Local deploy to wordpress.org SVN (reads .env)
 ```
 
 ## Local development
@@ -31,13 +32,14 @@ New-Item -ItemType SymbolicLink -Path C:\path\to\wp-content\plugins\wp-api-stats
 
 ## Releasing
 
-1. Bump `Version:` in `src/wp-api-stats.php` **and** `Stable tag:` in `src/readme.txt`, add a changelog entry.
-2. `bash bin/build.sh` (fails if versions don't match) and test the zip.
-3. Commit, then `git tag v1.5 && git push origin main v1.5`.
-4. The **Deploy to WordPress.org** workflow pushes to SVN `trunk/`, `tags/1.5/` and `assets/`, and creates a GitHub release with the zip.
+wordpress.org SVN credentials live in a local, git-ignored `.env` (see `.env.example`). They are never stored on GitHub.
 
-Readme-only / asset-only change (e.g. bump *Tested up to*): commit, push, then run
-**Update readme & assets on WordPress.org** manually from the Actions tab.
+1. Bump `Version:` in `src/wp-api-stats.php`, `SG_API_STATS_VERSION`, and `Stable tag:` in `src/readme.txt`; add a changelog entry.
+2. `bash bin/deploy.sh`: builds, syncs into `./svn` (git-ignored) and shows the SVN changes (dry run).
+3. Commit, then `git tag v1.5 && git push origin main v1.5`. CI attaches the zip to a GitHub release.
+4. `bash bin/deploy.sh --commit` publishes `trunk/`, `tags/1.5/` and `assets/` to wordpress.org.
 
-One-time setup: add repo secrets `SVN_USERNAME` and `SVN_PASSWORD`
-(SVN password is set at https://profiles.wordpress.org/me/profile/edit/group/3/?screen=svn-password).
+Readme/asset-only change (e.g. bump *Tested up to*): commit, then `bash bin/deploy.sh --readme-only [--commit]`.
+It refuses if code differs from the released tag.
+
+Needs `svn` on PATH (Windows: TortoiseSVN with command-line tools; Ubuntu: `apt install subversion`).

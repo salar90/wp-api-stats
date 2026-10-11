@@ -1,0 +1,31 @@
+# On a version tag: build the plugin zip and attach it to a GitHub release.
+# Deploying to wordpress.org SVN is done locally with bin/deploy.sh (credentials stay in .env, not on GitHub).
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: bash bin/build.sh
+
+      - name: Check tag matches plugin version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER=$(grep -m1 -iE '^\s*\*?\s*Version:' src/wp-api-stats.php | awk '{print $NF}' | tr -d '\r')
+          [ "$TAG" = "$VER" ] || { echo "::error::Tag $GITHUB_REF_NAME does not match plugin Version $VER"; exit 1; }
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/wp-api-stats-*.zip
+          generate_release_notes: true

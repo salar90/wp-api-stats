@@ -1,3 +1,8 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
 # Build output (see bin/build.sh)
 /dist/
 

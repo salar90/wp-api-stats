@@ -3,7 +3,7 @@
 Plugin Name: WP API Stats
 Description: View and filter API calls to your website with details about Method, Path, Response time, and Count.
 Author: Salar Gholizadeh
-Version: 1.5
+Version: 1.6
 Requires at least: 5.3
 Requires PHP: 7.2
 Plugin URI: https://github.com/salar90/wp-api-stats
@@ -17,7 +17,7 @@ Text Domain: wp-api-stats
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
-define( 'SG_API_STATS_VERSION', '1.5' );
+define( 'SG_API_STATS_VERSION', '1.6' );
 
 require_once __DIR__ . '/administration.php';
 register_uninstall_hook( __FILE__, 'sg_api_stats_uninstall' );

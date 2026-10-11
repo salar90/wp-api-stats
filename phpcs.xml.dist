@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <ruleset name="WP API Stats">
 	<file>./src</file>
-	<exclude-pattern>src/assets/chartjs/*</exclude-pattern>
+	<exclude-pattern>src/assets/vendor/*</exclude-pattern>
 	<arg name="extensions" value="php"/>
 	<arg value="sp"/>
 

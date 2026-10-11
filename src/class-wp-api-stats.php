@@ -8,7 +8,7 @@ class SG_API_Stats {
 	const PAGE_SLUG  = 'api-stats';
 	const PAGE_HOOK  = 'tools_page_api-stats';
 	const MAX_POINTS = 3000;
-	const MAX_ROUTES = 200;
+	const MAX_ROUTES = 500;
 
 	/** Chunk name => length in seconds. */
 	const CHUNKS = array(
@@ -18,7 +18,12 @@ class SG_API_Stats {
 		'Week'   => WEEK_IN_SECONDS,
 	);
 
-	const METHODS = array( 'GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'OPTIONS' );
+	const METHODS = array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS' );
+
+	const STATUS_CLASSES = array( '2xx', '3xx', '4xx', '5xx' );
+
+	/** Table grouping modes. */
+	const GROUPS = array( 'pattern', 'path' );
 
 	private $settings      = array();
 	private $prepared_data = false;
@@ -40,6 +45,10 @@ class SG_API_Stats {
 
 		// enqueue js and css files, and pass chart data to js
 		add_action( 'admin_enqueue_scripts', array( $this, 'load_admin_assets' ) );
+
+		// form handlers
+		add_action( 'admin_post_sg_api_stats_save_settings', array( $this, 'handle_save_settings' ) );
+		add_action( 'admin_post_sg_api_stats_purge', array( $this, 'handle_purge' ) );
 	}
 
 	/**
@@ -48,6 +57,13 @@ class SG_API_Stats {
 	public static function table_name() {
 		global $wpdb;
 		return $wpdb->prefix . 'sg_api_stats_events';
+	}
+
+	/**
+	 * URL of the stats page, optionally with query args.
+	 */
+	public static function page_url( $args = array() ) {
+		return add_query_arg( array_merge( array( 'page' => self::PAGE_SLUG ), $args ), admin_url( 'tools.php' ) );
 	}
 
 	/**
@@ -67,6 +83,17 @@ class SG_API_Stats {
 	public function pre_serve( $served, $response, $request ) {
 		global $wpdb;
 
+		/**
+		 * Filters whether this REST request is recorded.
+		 *
+		 * @param bool             $record   Whether to record the request. Default true.
+		 * @param WP_REST_Request  $request  The request.
+		 * @param WP_HTTP_Response $response The response about to be sent.
+		 */
+		if ( ! apply_filters( 'sg_api_stats_should_record', true, $request, $response ) ) {
+			return $served;
+		}
+
 		$response_status = 0;
 		if ( is_a( $response, WP_HTTP_Response::class ) ) {
 			$response_status = $response->get_status();
@@ -75,24 +102,52 @@ class SG_API_Stats {
 			$response_status = $response->get_error_code();
 		}
 
+		// Matched route pattern, e.g. /wp/v2/posts/(?P<id>[\d]+). Empty when no route matched (404).
+		$route_pattern = '';
+		if ( is_a( $response, WP_REST_Response::class ) ) {
+			$route_pattern = (string) $response->get_matched_route();
+		}
+
+		/**
+		 * Filters a human-readable label stored with the request, shown next to the route.
+		 *
+		 * Example: return the title of the post a route like /myapi/doc/123 refers to.
+		 *
+		 * @param string           $label    Label. Default empty.
+		 * @param WP_REST_Request  $request  The request.
+		 * @param WP_HTTP_Response $response The response about to be sent.
+		 */
+		$label = (string) apply_filters( 'sg_api_stats_label', '', $request, $response );
+
 		$start_time = $this->start_time ? $this->start_time : microtime( true );
 		$time_taken = floor( ( microtime( true ) - $start_time ) * 1000 );
 
-		// Route and method come straight from the client: they are stored as-is
-		// and must always be escaped on output.
+		// Route, method and label come from the client or third-party code:
+		// they are stored as-is and must always be escaped on output.
 		$wpdb->insert(
 			self::table_name(),
 			array(
-				'method'       => substr( $request->get_method(), 0, 20 ),
-				'route'        => substr( $request->get_route(), 0, 2000 ),
-				'respose_code' => substr( (string) $response_status, 0, 45 ),
-				'time'         => current_time( 'mysql', true ),
-				'duration'     => $time_taken,
+				'method'        => substr( $request->get_method(), 0, 20 ),
+				'route'         => substr( $request->get_route(), 0, 2000 ),
+				'route_pattern' => '' === $route_pattern ? null : substr( $route_pattern, 0, 2000 ),
+				'label'         => '' === $label ? null : mb_substr( $label, 0, 255 ),
+				'respose_code'  => substr( (string) $response_status, 0, 45 ),
+				'time'          => current_time( 'mysql', true ),
+				'duration'      => $time_taken,
 			),
-			array( '%s', '%s', '%s', '%s', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%d' )
 		);
 
 		return $served;
+	}
+
+	/**
+	 * Read a GET param restricted to a set of allowed values.
+	 */
+	private static function read_choice_param( $key, $allowed, $fallback ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter.
+		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+		return in_array( $value, $allowed, true ) ? $value : $fallback;
 	}
 
 	/**
@@ -132,11 +187,8 @@ class SG_API_Stats {
 			list( $current_date_from, $current_date_to ) = array( $current_date_to, $current_date_from );
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter.
-		$selected_chunk = isset( $_GET['chunk'] ) ? sanitize_text_field( wp_unslash( $_GET['chunk'] ) ) : '';
-		if ( ! array_key_exists( $selected_chunk, self::CHUNKS ) ) {
-			$selected_chunk = 'Hour';
-		}
+		$selected_chunk = self::read_choice_param( 'chunk', array_keys( self::CHUNKS ), 'Hour' );
+		$group          = self::read_choice_param( 'group', self::GROUPS, 'pattern' );
 
 		// Range is [from 00:00, to+1 day 00:00) in the site's timezone.
 		$range_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $current_date_from, $tz );
@@ -161,35 +213,46 @@ class SG_API_Stats {
 		$utc_end   = gmdate( 'Y-m-d H:i:s', $range_end->getTimestamp() );
 		$table     = self::table_name();
 
-		// One grouped query for the whole chart instead of one per point.
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name and group expressions are not user input.
+
+		// Chart: one grouped query for every point, by method and status class.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT method, FLOOR( TIMESTAMPDIFF( SECOND, %s, `time` ) / %d ) AS bucket, COUNT(*) AS c
+				"SELECT method, LEFT( respose_code, 1 ) AS status_class,
+					FLOOR( TIMESTAMPDIFF( SECOND, %s, `time` ) / %d ) AS bucket, COUNT(*) AS c
 				FROM `$table`
 				WHERE `time` >= %s AND `time` < %s
-				GROUP BY bucket, method",
+				GROUP BY bucket, method, status_class",
 				$utc_start,
 				$chunk_seconds,
 				$utc_start,
 				$utc_end
 			)
 		);
-		// phpcs:enable
 
-		$data = array( 'all' => array_fill( 0, $chunk_count, 0 ) );
+		$zeros  = array_fill( 0, $chunk_count, 0 );
+		$data   = array( 'all' => $zeros );
+		$status = array();
 		foreach ( self::METHODS as $method ) {
-			$data[ $method ] = array_fill( 0, $chunk_count, 0 );
+			$data[ $method ] = $zeros;
+		}
+		foreach ( self::STATUS_CLASSES as $class ) {
+			$status[ $class ] = $zeros;
 		}
 		foreach ( $rows as $row ) {
 			$bucket = (int) $row->bucket;
 			if ( $bucket < 0 || $bucket >= $chunk_count ) {
 				continue;
 			}
+			$c = (int) $row->c;
 			if ( isset( $data[ $row->method ] ) ) {
-				$data[ $row->method ][ $bucket ] += (int) $row->c;
+				$data[ $row->method ][ $bucket ] += $c;
 			}
-			$data['all'][ $bucket ] += (int) $row->c;
+			$class = $row->status_class . 'xx';
+			if ( isset( $status[ $class ] ) ) {
+				$status[ $class ][ $bucket ] += $c;
+			}
+			$data['all'][ $bucket ] += $c;
 		}
 
 		$multi_day = $duration > DAY_IN_SECONDS;
@@ -203,13 +266,29 @@ class SG_API_Stats {
 			$labels[] = wp_date( $label_format, $start_ts + $i * $chunk_seconds, $tz );
 		}
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is not user input.
+		// Old rows (schema 1) and 404s have no pattern: fall back to the concrete path.
+		$route_expr = 'pattern' === $group ? "COALESCE( NULLIF( route_pattern, '' ), route )" : 'route';
+		$is_error   = 'CAST( respose_code AS UNSIGNED ) >= 400';
+
+		$summary = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT COUNT(*) AS total, SUM( $is_error ) AS errors, AVG( duration ) AS avg_duration,
+					MAX( duration ) AS max_duration, COUNT( DISTINCT $route_expr ) AS routes
+				FROM `$table`
+				WHERE `time` >= %s AND `time` < %s",
+				$utc_start,
+				$utc_end
+			)
+		);
+
 		$tableData = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT method, route, COUNT(id) AS count, AVG(duration) AS average_duration
+				"SELECT method, $route_expr AS route, COUNT(*) AS count, SUM( $is_error ) AS errors,
+					AVG( duration ) AS average_duration, MAX( duration ) AS max_duration,
+					COUNT( DISTINCT route ) AS paths, MAX( label ) AS label
 				FROM `$table`
 				WHERE `time` >= %s AND `time` < %s
-				GROUP BY method, route
+				GROUP BY method, $route_expr
 				ORDER BY count DESC
 				LIMIT %d",
 				$utc_start,
@@ -219,7 +298,7 @@ class SG_API_Stats {
 		);
 		// phpcs:enable
 
-		$this->prepared_data = compact( 'data', 'tableData', 'current_date_from', 'current_date_to', 'selected_chunk', 'labels' );
+		$this->prepared_data = compact( 'data', 'status', 'summary', 'tableData', 'current_date_from', 'current_date_to', 'selected_chunk', 'group', 'labels' );
 
 		return $this->prepared_data;
 	}
@@ -230,7 +309,7 @@ class SG_API_Stats {
 	public function getDataSize() {
 		global $wpdb;
 
-		$size = $wpdb->get_var(
+		return $wpdb->get_var(
 			$wpdb->prepare(
 				'SELECT ROUND( ( data_length + index_length ) / 1024 / 1024, 2 )
 				FROM information_schema.TABLES
@@ -239,8 +318,16 @@ class SG_API_Stats {
 				self::table_name()
 			)
 		);
+	}
 
-		return $size;
+	/**
+	 * Total number of stored events.
+	 */
+	public function getRowCount() {
+		global $wpdb;
+		$table = self::table_name();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is not user input.
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$table`" );
 	}
 
 	/**
@@ -263,35 +350,62 @@ class SG_API_Stats {
 		}
 
 		extract( $this->prepare_data() ); // phpcs:ignore WordPress.PHP.DontExtract.extract_extract
-		include __DIR__ . '/views/admin-panel.php';
-		include __DIR__ . '/views/table.php';
 
-		$data_size = $this->getDataSize();
-		if ( null !== $data_size ) {
-			echo '<br><hr><p>';
-			printf(
-				/* translators: 1: database table name, 2: size in MB */
-				esc_html__( 'API events are stored in %1$s table. Size: %2$s MB', 'wp-api-stats' ),
-				'<strong>' . esc_html( self::table_name() ) . '</strong>',
-				'<strong>' . esc_html( $data_size ) . '</strong>'
-			);
-			echo '</p>';
+		$data_size      = $this->getDataSize();
+		$row_count      = $this->getRowCount();
+		$settings       = sg_api_stats_get_settings();
+		$retention_days = sg_api_stats_get_retention_days();
+		$tz_name        = wp_timezone_string();
+
+		include __DIR__ . '/views/admin-panel.php';
+	}
+
+	public function handle_save_settings() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to do that.', 'wp-api-stats' ), 403 );
 		}
+		check_admin_referer( 'sg_api_stats_save_settings' );
+
+		$days = isset( $_POST['retention_days'] ) ? absint( wp_unslash( $_POST['retention_days'] ) ) : SG_API_STATS_DEFAULT_RETENTION_DAYS;
+
+		$settings                   = sg_api_stats_get_settings();
+		$settings['retention_days'] = min( $days, 3650 );
+		update_option( 'sg_api_stats_settings', $settings, false );
+
+		wp_safe_redirect( self::page_url( array( 'sg-notice' => 'saved' ) ) . '#api-stats-data' );
+		exit;
+	}
+
+	public function handle_purge() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to do that.', 'wp-api-stats' ), 403 );
+		}
+		check_admin_referer( 'sg_api_stats_purge' );
+
+		sg_api_stats_purge_all();
+
+		wp_safe_redirect( self::page_url( array( 'sg-notice' => 'purged' ) ) );
+		exit;
 	}
 
 	public function load_admin_assets( $hook ) {
 		if ( self::PAGE_HOOK !== $hook ) {
 			return;
 		}
-		wp_enqueue_style( 'chartjs-css', plugins_url( 'assets/chartjs/Chart.min.css', __FILE__ ), array(), '2.8.0' );
-		wp_enqueue_script( 'chartjs', plugins_url( 'assets/chartjs/Chart.min.js', __FILE__ ), array(), '2.8.0', false );
-		wp_enqueue_script( 'api-stats-draw', plugins_url( 'assets/draw.js', __FILE__ ), array( 'chartjs' ), SG_API_STATS_VERSION, true );
+		wp_enqueue_script( 'chartjs', plugins_url( 'assets/vendor/chartjs/chart.umd.min.js', __FILE__ ), array(), '4.5.1', true );
+		wp_enqueue_script( 'api-stats-admin', plugins_url( 'assets/admin.js', __FILE__ ), array( 'chartjs' ), SG_API_STATS_VERSION, true );
 		wp_enqueue_style( 'api-stats', plugins_url( 'assets/api-stats.css', __FILE__ ), array(), SG_API_STATS_VERSION );
 
-		wp_add_inline_script(
-			'api-stats-draw',
-			'var ApichartData = ' . wp_json_encode( array_intersect_key( $this->prepare_data(), array_flip( array( 'data', 'labels' ) ) ) ) . ';',
-			'before'
+		$prepared = $this->prepare_data();
+		$js_data  = array(
+			'labels'  => $prepared['labels'],
+			'methods' => array_diff_key( $prepared['data'], array( 'all' => true ) ),
+			'status'  => $prepared['status'],
+			'i18n'    => array(
+				'requests'     => __( 'Requests', 'wp-api-stats' ),
+				'confirmPurge' => __( 'Delete ALL recorded API events? This cannot be undone.', 'wp-api-stats' ),
+			),
 		);
+		wp_add_inline_script( 'api-stats-admin', 'var ApiStatsData = ' . wp_json_encode( $js_data ) . ';', 'before' );
 	}
 }

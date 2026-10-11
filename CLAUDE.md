@@ -19,15 +19,30 @@ Tools → API Stats.
 - Default branch is `main`. Line endings: LF (enforced by `.gitattributes`).
 
 ## Code map (`src/`)
-- `wp-api-stats.php`: plugin header, activation/deactivation/uninstall hooks, instantiates `SG_API_Stats` into global `$WP_API_Stats`.
-- `administration.php`: activation (creates table via `dbDelta`, schedules hourly cron), cron `sg_api_clear_old_data` (deletes rows > 30 days), deactivation.
+- `wp-api-stats.php`: plugin header, `SG_API_STATS_VERSION`, activation/deactivation/uninstall hooks, instantiates `SG_API_Stats` into global `$WP_API_Stats`.
+- `administration.php`: schema (`sg_api_stats_create_db`, `SG_API_STATS_DB_VERSION`), `sg_api_stats_maybe_upgrade` on
+  `plugins_loaded` (updates don't run activation), settings (`sg_api_stats_settings` option: `retention_days`),
+  hourly cron `sg_api_clear_old_data` (batched deletes, respects retention, 0 = keep), purge, uninstall.
 - `class-wp-api-stats.php`: `SG_API_Stats`
-  - `rest_api_init` records start time; `rest_pre_serve_request` filter (`pre_serve`) inserts one row per request.
-  - `prepare_data()` builds chart buckets (Minute/Hour/Day/Week, max 3000 buckets) + top routes table from `$_POST` filters.
-  - Admin page at `tools.php?page=api-stats` (hook suffix `tools_page_api-stats`); data passed to JS as `window.ApichartData`.
-- `views/admin-panel.php` (filter form + canvas), `views/table.php` (top routes).
-- `assets/draw.js` (Chart.js 2.8 rendering), `assets/api-stats.scss` → `api-stats.css` (compiled by hand; scss is excluded from builds).
-- DB table: `{prefix}sg_api_stats_events` (id, user, time, duration, method, route, version, respose_code [sic]). Option `sg_api_stats_db_version`.
+  - `rest_api_init` records start time; `rest_pre_serve_request` (`pre_serve`) inserts one row per request
+    with route, matched `route_pattern`, optional `label`, status, duration.
+  - `prepare_data()`: GET filters (`date-from`, `date-to`, `chunk`, `group` = pattern|path), chart buckets by method
+    and status class, summary, routes table (top 500). All in the site timezone; `time` column is UTC.
+  - `admin-post.php` handlers `sg_api_stats_save_settings` / `sg_api_stats_purge` (capability + nonce).
+  - Data passed to JS as `window.ApiStatsData` via `wp_add_inline_script`.
+- `views/admin-panel.php`: the whole Tools → API Stats page (toolbar, cards, chart, routes table, stored-data card).
+- `assets/admin.js`: chart (method/status toggle), table sort + search, purge confirm. Plain JS, no build step.
+- `assets/api-stats.css`: page styles (plain CSS, WP admin look).
+- `assets/vendor/chartjs/`: Chart.js 4.5.1 UMD build + MIT license. To update: download
+  `https://registry.npmjs.org/chart.js/-/chart.js-<ver>.tgz`, check its `dist.integrity` from the registry, copy
+  `package/dist/chart.umd.min.js`, bump the version in `load_admin_assets()`.
+- DB table `{prefix}sg_api_stats_events` (schema 2): id BIGINT, user, time (UTC, indexed), duration (ms), method, route,
+  route_pattern, label, version, respose_code [sic]. Options: `sg_api_stats_db_version`, `sg_api_stats_settings`.
+
+## Public hooks (documented in readme FAQ; keep backwards compatible)
+- `sg_api_stats_should_record( bool $record, WP_REST_Request $request, WP_HTTP_Response $response )`
+- `sg_api_stats_label( string $label, WP_REST_Request $request, WP_HTTP_Response $response )`
+- `sg_api_stats_retention_days( int $days )`
 
 ## Local dev environment (Windows box)
 - Laravel **Herd** serves every folder in `C:\Users\Salar\Dev` as `<folder>.test`. Herd must be running
@@ -68,6 +83,5 @@ Tools → API Stats.
 ## Known issues / TODO
 - Only smoke-tested on PHP 8.3; PHP 7.2 compatibility is checked by lint/PHPCompatibility only.
 - Request start time uses `rest_api_init`; `user` column is never populated; `version` column unused.
-- No DB schema upgrade routine (activation hook doesn't run on plugin update); fine while schema is unchanged.
-- Bundled Chart.js 2.8.0 is old.
-- Every REST request does a synchronous INSERT; no sampling/opt-out filter.
+- Every REST request does a synchronous INSERT; no sampling.
+- Ideas not done yet: exclude routes via UI, CSV export, WP-CLI commands, PHPUnit tests, banner/screenshots for wp.org.

@@ -2,7 +2,7 @@
 Contributors: salar6990
 Tags: API REST-API Statistics stats
 Requires at least: 5.3
-Tested up to: 6.4.1
+Tested up to: 7.1
 Requires PHP: 7.2
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html

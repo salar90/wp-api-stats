@@ -1,0 +1,16 @@
+# Normalize line endings: LF in the repo, regardless of OS (Windows + Ubuntu dev).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.zip binary
+
+# Keep dev-only files out of `git archive` exports.
+/.github        export-ignore
+/.wordpress-org export-ignore
+/bin            export-ignore
+/.gitattributes export-ignore
+/.gitignore     export-ignore
+/CLAUDE.md      export-ignore
+/README.md      export-ignore

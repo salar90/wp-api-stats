@@ -30,6 +30,12 @@
 	gap: 4px;
 }
 
+/* Core admin styles give forms a bottom margin, which pushes the inputs above the range buttons. */
+.api-stats-filters,
+.api-stats-points {
+	margin: 0;
+}
+
 .api-stats-filters {
 	display: flex;
 	flex-wrap: wrap;
@@ -352,4 +358,8 @@
 		min-width: 0;
 		width: 100%;
 	}
+}
+
+.api-stats-filters select {
+	min-width: 130px;
 }

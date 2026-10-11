@@ -147,15 +147,6 @@
 			} );
 		} );
 
-		var search = document.querySelector( '.api-stats-search' );
-		if ( search ) {
-			search.addEventListener( 'input', function () {
-				var q = search.value.trim().toLowerCase();
-				Array.prototype.forEach.call( tbody.rows, function ( row ) {
-					row.hidden = q !== '' && row.textContent.toLowerCase().indexOf( q ) === -1;
-				} );
-			} );
-		}
 	}
 
 	function initPurge() {
@@ -199,8 +190,18 @@
 		} );
 	}
 
+	// View options that need a reload (e.g. chart points) apply as soon as they change.
+	function initAutosubmit() {
+		document.querySelectorAll( 'select[data-autosubmit]' ).forEach( function ( select ) {
+			select.addEventListener( 'change', function () {
+				select.form.submit();
+			} );
+		} );
+	}
+
 	initChart();
 	initTable();
+	initAutosubmit();
 	initPurge();
 	initRetention();
 }() );

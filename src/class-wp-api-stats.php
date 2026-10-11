@@ -145,9 +145,28 @@ class SG_API_Stats {
 	 * Read a GET param restricted to a set of allowed values.
 	 */
 	private static function read_choice_param( $key, $allowed, $fallback ) {
+		$value = self::read_text_param( $key );
+		return in_array( $value, $allowed, true ) ? $value : $fallback;
+	}
+
+	/**
+	 * Read a free-text GET param (trimmed, length-limited).
+	 */
+	private static function read_text_param( $key, $max_length = 200 ) {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter.
 		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
-		return in_array( $value, $allowed, true ) ? $value : $fallback;
+		return mb_substr( trim( $value ), 0, $max_length );
+	}
+
+	/**
+	 * Read a route GET param. Route patterns contain regex characters such as `(?P<id>[\d]+)`,
+	 * which sanitize_text_field() would mangle, so only strip control characters.
+	 */
+	private static function read_route_param( $key ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only filter; only used as a prepared SQL value and escaped on output.
+		$value = isset( $_GET[ $key ] ) ? (string) wp_unslash( $_GET[ $key ] ) : '';
+		$value = preg_replace( '/[\x00-\x1F\x7F]/u', '', $value );
+		return mb_substr( trim( (string) $value ), 0, 2000 );
 	}
 
 	/**
@@ -156,13 +175,108 @@ class SG_API_Stats {
 	 * @return string|null The date, or null if missing/invalid.
 	 */
 	private static function read_date_param( $key ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter.
-		$value = isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+		$value = self::read_text_param( $key );
 		$date  = DateTimeImmutable::createFromFormat( '!Y-m-d', $value, wp_timezone() );
 		if ( ! $date || $date->format( 'Y-m-d' ) !== $value ) {
 			return null;
 		}
 		return $value;
+	}
+
+	/**
+	 * Current page state from the URL: filters (which requests count) and view options (how they are shown).
+	 *
+	 * @return array{date_from:string,date_to:string,q:string,route:string,method:string,status:string,chunk:string,group:string}
+	 */
+	public static function get_state() {
+		$today = new DateTimeImmutable( 'today', wp_timezone() );
+
+		$from = self::read_date_param( 'date-from' );
+		$to   = self::read_date_param( 'date-to' );
+		if ( null === $from ) {
+			$from = $today->modify( '-1 day' )->format( 'Y-m-d' );
+		}
+		if ( null === $to ) {
+			$to = $today->format( 'Y-m-d' );
+		}
+		if ( $to < $from ) {
+			list( $from, $to ) = array( $to, $from );
+		}
+
+		return array(
+			// Filters: applied to cards, chart and table alike.
+			'date_from' => $from,
+			'date_to'   => $to,
+			'q'         => self::read_text_param( 'q' ),
+			'route'     => self::read_route_param( 'route' ),
+			'method'    => self::read_choice_param( 'method', self::METHODS, '' ),
+			'status'    => self::read_choice_param( 'status', array_merge( self::STATUS_CLASSES, array( 'errors' ) ), '' ),
+			// View options.
+			'chunk'     => self::read_choice_param( 'chunk', array_keys( self::CHUNKS ), 'Hour' ),
+			'group'     => self::read_choice_param( 'group', self::GROUPS, 'pattern' ),
+		);
+	}
+
+	/**
+	 * URL query args for a state, without empty values.
+	 */
+	public static function state_args( $state ) {
+		$args = array(
+			'date-from' => $state['date_from'],
+			'date-to'   => $state['date_to'],
+			'q'         => $state['q'],
+			'route'     => $state['route'],
+			'method'    => $state['method'],
+			'status'    => $state['status'],
+			'chunk'     => $state['chunk'],
+			'group'     => $state['group'],
+		);
+		return array_filter(
+			$args,
+			function ( $value ) {
+				return '' !== $value;
+			}
+		);
+	}
+
+	/**
+	 * Stats page URL for the given state with some values changed ('' removes a value).
+	 */
+	public static function state_url( $state, $changes = array() ) {
+		return self::page_url( array_map( 'rawurlencode', self::state_args( array_merge( $state, $changes ) ) ) );
+	}
+
+	/**
+	 * Prepared SQL WHERE clause for the time range and the active filters.
+	 */
+	private static function build_where( $state, $utc_start, $utc_end ) {
+		global $wpdb;
+
+		$sql  = '`time` >= %s AND `time` < %s';
+		$args = array( $utc_start, $utc_end );
+
+		if ( '' !== $state['q'] ) {
+			$like = '%' . $wpdb->esc_like( $state['q'] ) . '%';
+			$sql .= ' AND ( route LIKE %s OR route_pattern LIKE %s OR label LIKE %s )';
+			$args = array_merge( $args, array( $like, $like, $like ) );
+		}
+		if ( '' !== $state['route'] ) {
+			// Exact match on either a pattern (row from "By pattern") or a path (row from "By exact path").
+			$sql .= " AND ( route = %s OR COALESCE( NULLIF( route_pattern, '' ), route ) = %s )";
+			$args = array_merge( $args, array( $state['route'], $state['route'] ) );
+		}
+		if ( '' !== $state['method'] ) {
+			$sql   .= ' AND method = %s';
+			$args[] = $state['method'];
+		}
+		if ( 'errors' === $state['status'] ) {
+			$sql .= ' AND CAST( respose_code AS UNSIGNED ) >= 400';
+		} elseif ( '' !== $state['status'] ) {
+			$sql   .= ' AND LEFT( respose_code, 1 ) = %s';
+			$args[] = substr( $state['status'], 0, 1 );
+		}
+
+		return $wpdb->prepare( $sql, $args ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- placeholders built above.
 	}
 
 	public function prepare_data() {
@@ -172,32 +286,18 @@ class SG_API_Stats {
 			return $this->prepared_data;
 		}
 
+		$state = self::get_state();
 		$tz    = wp_timezone();
-		$today = new DateTimeImmutable( 'today', $tz );
-
-		$current_date_from = self::read_date_param( 'date-from' );
-		$current_date_to   = self::read_date_param( 'date-to' );
-		if ( null === $current_date_from ) {
-			$current_date_from = $today->modify( '-1 day' )->format( 'Y-m-d' );
-		}
-		if ( null === $current_date_to ) {
-			$current_date_to = $today->format( 'Y-m-d' );
-		}
-		if ( $current_date_to < $current_date_from ) {
-			list( $current_date_from, $current_date_to ) = array( $current_date_to, $current_date_from );
-		}
-
-		$selected_chunk = self::read_choice_param( 'chunk', array_keys( self::CHUNKS ), 'Hour' );
-		$group          = self::read_choice_param( 'group', self::GROUPS, 'pattern' );
 
 		// Range is [from 00:00, to+1 day 00:00) in the site's timezone.
-		$range_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $current_date_from, $tz );
-		$range_end   = DateTimeImmutable::createFromFormat( '!Y-m-d', $current_date_to, $tz )->modify( '+1 day' );
+		$range_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $state['date_from'], $tz );
+		$range_end   = DateTimeImmutable::createFromFormat( '!Y-m-d', $state['date_to'], $tz )->modify( '+1 day' );
 		$start_ts    = $range_start->getTimestamp();
 		$duration    = $range_end->getTimestamp() - $start_ts;
 
 		// Grow the chunk size until the number of points is manageable.
-		$chunk_names = array_keys( self::CHUNKS );
+		$selected_chunk = $state['chunk'];
+		$chunk_names    = array_keys( self::CHUNKS );
 		while ( ceil( $duration / self::CHUNKS[ $selected_chunk ] ) > self::MAX_POINTS ) {
 			$next = array_search( $selected_chunk, $chunk_names, true ) + 1;
 			if ( ! isset( $chunk_names[ $next ] ) ) {
@@ -205,15 +305,17 @@ class SG_API_Stats {
 			}
 			$selected_chunk = $chunk_names[ $next ];
 		}
-		$chunk_seconds = self::CHUNKS[ $selected_chunk ];
-		$chunk_count   = (int) ceil( $duration / $chunk_seconds );
+		$state['chunk'] = $selected_chunk;
+		$chunk_seconds  = self::CHUNKS[ $selected_chunk ];
+		$chunk_count    = (int) ceil( $duration / $chunk_seconds );
 
 		// The `time` column holds UTC.
 		$utc_start = gmdate( 'Y-m-d H:i:s', $start_ts );
 		$utc_end   = gmdate( 'Y-m-d H:i:s', $range_end->getTimestamp() );
 		$table     = self::table_name();
+		$where     = self::build_where( $state, $utc_start, $utc_end );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name and group expressions are not user input.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared -- $where is prepared in build_where(); table name and expressions are not user input.
 
 		// Chart: one grouped query for every point, by method and status class.
 		$rows = $wpdb->get_results(
@@ -221,12 +323,10 @@ class SG_API_Stats {
 				"SELECT method, LEFT( respose_code, 1 ) AS status_class,
 					FLOOR( TIMESTAMPDIFF( SECOND, %s, `time` ) / %d ) AS bucket, COUNT(*) AS c
 				FROM `$table`
-				WHERE `time` >= %s AND `time` < %s
+				WHERE $where
 				GROUP BY bucket, method, status_class",
 				$utc_start,
-				$chunk_seconds,
-				$utc_start,
-				$utc_end
+				$chunk_seconds
 			)
 		);
 
@@ -267,18 +367,14 @@ class SG_API_Stats {
 		}
 
 		// Old rows (schema 1) and 404s have no pattern: fall back to the concrete path.
-		$route_expr = 'pattern' === $group ? "COALESCE( NULLIF( route_pattern, '' ), route )" : 'route';
+		$route_expr = 'pattern' === $state['group'] ? "COALESCE( NULLIF( route_pattern, '' ), route )" : 'route';
 		$is_error   = 'CAST( respose_code AS UNSIGNED ) >= 400';
 
 		$summary = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT COUNT(*) AS total, SUM( $is_error ) AS errors, AVG( duration ) AS avg_duration,
-					MAX( duration ) AS max_duration, COUNT( DISTINCT $route_expr ) AS routes
-				FROM `$table`
-				WHERE `time` >= %s AND `time` < %s",
-				$utc_start,
-				$utc_end
-			)
+			"SELECT COUNT(*) AS total, SUM( $is_error ) AS errors, AVG( duration ) AS avg_duration,
+				MAX( duration ) AS max_duration, COUNT( DISTINCT $route_expr ) AS routes
+			FROM `$table`
+			WHERE $where"
 		);
 
 		$tableData = $wpdb->get_results(
@@ -287,18 +383,16 @@ class SG_API_Stats {
 					AVG( duration ) AS average_duration, MAX( duration ) AS max_duration,
 					COUNT( DISTINCT route ) AS paths, MAX( label ) AS label
 				FROM `$table`
-				WHERE `time` >= %s AND `time` < %s
+				WHERE $where
 				GROUP BY method, $route_expr
 				ORDER BY count DESC
 				LIMIT %d",
-				$utc_start,
-				$utc_end,
 				self::MAX_ROUTES
 			)
 		);
 		// phpcs:enable
 
-		$this->prepared_data = compact( 'data', 'status', 'summary', 'tableData', 'current_date_from', 'current_date_to', 'selected_chunk', 'group', 'labels' );
+		$this->prepared_data = compact( 'state', 'data', 'status', 'summary', 'tableData', 'labels' );
 
 		return $this->prepared_data;
 	}

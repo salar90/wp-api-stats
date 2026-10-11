@@ -6,7 +6,7 @@ Tested up to: 7.1
 Requires PHP: 7.2
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
-Stable Tag: 1.6
+Stable Tag: 2.0
 
 View and filter API calls to your website with details about Method, Path, Response time, and Count.
 
@@ -18,8 +18,9 @@ API Stats records every REST API request to your site and shows you what is bein
 * Records every REST route: WordPress core, WooCommerce and any other plugin or custom endpoint
 * Requests-over-time chart, broken down by HTTP method or by status (2xx / 3xx / 4xx / 5xx)
 * Summary of requests, error rate, average and maximum response time
-* Routes table grouped by route pattern (e.g. `/wp/v2/posts/(?P<id>[\d]+)`) or by exact path, with error counts and timings; sortable and searchable
+* Routes table grouped by route pattern (e.g. `/wp/v2/posts/(?P<id>[\d]+)`) or by exact path, with error counts and timings
 * Quick date ranges (today, yesterday, 7 and 30 days) or any custom range, with minute / hour / day / week resolution
+* Filter everything by route (contains or exact), HTTP method and status (e.g. only errors); click a route to drill down
 * Configurable data retention, and a button to delete all recorded data
 * Developer hooks to skip requests or attach a readable label to them
 
@@ -61,13 +62,15 @@ Requests are grouped by the registered route they matched, so `/wp/v2/posts/1`, 
 Your site's timezone (Settings → General). Durations are measured from the start of REST API handling until the response is sent, in milliseconds.
 
 == Screenshots ==
-1. Stats page: summary, requests over time by HTTP method, routes grouped by route pattern, and data retention settings.
-2. Chart by response status (an incident with 5xx errors stands out) and routes by exact path, with labels added through the sg_api_stats_label filter.
-
+1. Stats page: filters, summary, requests over time by HTTP method, routes grouped by route pattern, and data retention.
+2. Drill-down: clicking a route filters the whole page. Here a failing endpoint, with the chart broken down by status.
+3. Routes by exact path, with readable labels added through the sg_api_stats_label filter.
 
 == Changelog ==
-= 1.6 =
-* New: refreshed stats page with summary cards, quick date ranges, sortable/searchable routes table
+= 2.0 =
+* New: redesigned stats page with summary cards, quick date ranges and a sortable routes table
+* New: filter the whole page (cards, chart and table) by route, method and status, e.g. "errors only"; active filters are shown as removable chips and kept in the URL
+* New: click a route in the table to drill down into it
 * New: chart breakdown by status class (2xx/3xx/4xx/5xx) in addition to HTTP method
 * New: routes grouped by registered route pattern, so /posts/1, /posts/2, ... count as one route (switchable to exact paths)
 * New: error counts and maximum duration per route

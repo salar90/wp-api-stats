@@ -9,14 +9,18 @@
 	max-width: 1400px;
 }
 
-/* Toolbar: quick ranges + custom range form */
-.api-stats-toolbar {
+/* Filter bar: quick ranges + filters (apply to the whole page) */
+.api-stats-filterbar {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-end;
 	justify-content: space-between;
 	gap: 12px 24px;
 	margin: 16px 0 4px;
+	padding: 12px 16px;
+	background: #fff;
+	border: 1px solid var(--api-stats-border);
+	border-radius: var(--api-stats-radius);
 }
 
 .api-stats-ranges,
@@ -33,7 +37,8 @@
 	gap: 8px 12px;
 }
 
-.api-stats-filters label {
+.api-stats-filters label,
+.api-stats-points label {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
@@ -226,10 +231,6 @@
 	color: var(--api-stats-bad);
 }
 
-.api-stats-search {
-	min-width: 200px;
-}
-
 .api-stats-empty {
 	color: var(--api-stats-muted);
 	padding: 24px 0;
@@ -264,13 +265,91 @@
 	.api-stats-chart {
 		height: 240px;
 	}
-
-	.api-stats-search {
-		min-width: 0;
-		width: 100%;
-	}
 }
 
 .api-stats-group-help {
 	margin: -4px 0 12px;
+}
+
+.api-stats-filter-q input {
+	min-width: 220px;
+}
+
+.api-stats-points label {
+	flex-direction: row;
+	align-items: center;
+	gap: 6px;
+}
+
+/* Active filter chips */
+.api-stats-chips {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 8px;
+	margin: 10px 0 0;
+}
+
+.api-stats-chips__title {
+	color: var(--api-stats-muted);
+	font-weight: 600;
+}
+
+.api-stats-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	padding: 2px 6px 2px 10px;
+	border: 1px solid var(--api-stats-accent);
+	border-radius: 999px;
+	background: #f0f6fc;
+	color: var(--api-stats-accent);
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+
+.api-stats-chip:hover,
+.api-stats-chip:focus {
+	background: var(--api-stats-accent);
+	color: #fff;
+}
+
+.api-stats-chip__x {
+	font-size: 16px;
+	line-height: 1;
+}
+
+.api-stats-chips__clear {
+	margin-left: 4px;
+}
+
+.api-stats-cards.is-filtered .api-stats-card {
+	background: #f6fafd;
+}
+
+.api-stats-panel__note {
+	color: var(--api-stats-muted);
+	font-weight: 400;
+	font-size: 12px;
+}
+
+/* Clickable routes */
+.api-stats-route a {
+	text-decoration: none;
+	color: inherit;
+}
+
+.api-stats-route a:hover code,
+.api-stats-route a:focus code {
+	color: var(--api-stats-accent);
+	text-decoration: underline;
+}
+
+@media screen and (max-width: 782px) {
+	.api-stats-filter-q,
+	.api-stats-filter-q input {
+		min-width: 0;
+		width: 100%;
+	}
 }

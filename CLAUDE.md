@@ -26,12 +26,16 @@ Tools → API Stats.
 - `class-wp-api-stats.php`: `SG_API_Stats`
   - `rest_api_init` records start time; `rest_pre_serve_request` (`pre_serve`) inserts one row per request
     with route, matched `route_pattern`, optional `label`, status, duration.
-  - `prepare_data()`: GET filters (`date-from`, `date-to`, `chunk`, `group` = pattern|path), chart buckets by method
-    and status class, summary, routes table (top 500). All in the site timezone; `time` column is UTC.
+  - Page state lives in the URL (`get_state()`, `state_url()`). **Filters** (`date-from`, `date-to`, `q` = route/pattern/label
+    contains, `route` = exact path or pattern, `method`, `status` = 2xx..5xx|errors) go through one `build_where()` and
+    apply to cards, chart and table alike. **View options** (`chunk` = chart points, `group` = pattern|path) only change
+    presentation. Keep that split: never add a filter that affects only part of the page.
+  - `prepare_data()`: chart buckets by method and status class, summary, routes table (top 500 after filtering).
+    All in the site timezone; `time` column is UTC. Table rows link to `route` + `method` (drill-down).
   - `admin-post.php` handlers `sg_api_stats_save_settings` / `sg_api_stats_purge` (capability + nonce).
   - Data passed to JS as `window.ApiStatsData` via `wp_add_inline_script`.
-- `views/admin-panel.php`: the whole Tools → API Stats page (toolbar, cards, chart, routes table, stored-data card).
-- `assets/admin.js`: chart (method/status toggle), table sort + search, purge confirm. Plain JS, no build step.
+- `views/admin-panel.php`: the whole Tools → API Stats page (filter bar + chips, cards, chart, routes table, stored-data card).
+- `assets/admin.js`: chart (method/status toggle), table sort, Points auto-submit, purge and retention confirms. Plain JS, no build step.
 - `assets/api-stats.css`: page styles (plain CSS, WP admin look).
 - `assets/vendor/chartjs/`: Chart.js 4.5.1 UMD build + MIT license. To update: download
   `https://registry.npmjs.org/chart.js/-/chart.js-<ver>.tgz`, check its `dist.integrity` from the registry, copy
